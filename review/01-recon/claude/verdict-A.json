@@ -1,0 +1,183 @@
+{
+  "case": "01",
+  "answer_id": "A",
+  "mandatory": [
+    {
+      "id": "K1-M1",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Система предназначена для обработки финансовых переводов с автоматической многофакторной проверкой."
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "проверяет суточные и месячные лимиты отправителя"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Проверяет отправителей по спискам блокировки на основе предопределенных причин"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "возвращают результаты, которые затем агрегируются (через потоковую обработку Kafka Streams) для принятия итогового решения"
+        }
+      ]
+    },
+    {
+      "id": "K1-M2",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "событийно-ориентированным взаимодействием (Event-Driven Architecture) … прямые вызовы между микросервисами по HTTP/gRPC отсутствуют, маршрутизация данных происходит исключительно через Kafka"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "профильные сервисы параллельно и независимо обрабатывают его"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Является точкой входа для создания переводов, агрегирует результаты проверок … Получает `transfer-service` (через Kafka Streams в `DecisionTopologyConfig`"
+        }
+      ]
+    },
+    {
+      "id": "K1-M3",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "**transfer-common** | Библиотека … **transfer-service** | Сервис … **limit-service** | Сервис … **screening-service** | Сервис"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "**transfer-common** | Библиотека | Внешний API: нет"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "**transfer-service** | Сервис | Внешний API: есть (REST, описан в `transfer-api.yaml`) … **limit-service** | Сервис | Внешний API: нет … **screening-service** | Сервис | Внешний API: нет"
+        }
+      ]
+    },
+    {
+      "id": "K1-M4",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Java 21"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "Spring Boot 3.4.1"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Spring Kafka), Apache Kafka Streams … Брокер сообщений: **Apache Kafka**"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "Liquibase, PostgreSQL (16-alpine)"
+        }
+      ]
+    },
+    {
+      "id": "K1-M5",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "*Топик `transfers`:* Отправляет `transfer-service` … Получают `limit-service` (группа `limit` … `screening-service` (группа `screening` … `transfer-service` (группа `transfer-tracker`"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "`limit-results`:* Отправляет `limit-service` … `screening-results`:* Отправляет `screening-service` … Получает `transfer-service` (через Kafka Streams … группой `transfer-tracker`"
+        }
+      ]
+    },
+    {
+      "id": "K1-M6",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "**Apache Kafka** (используется образ `confluentinc/cp-kafka:7.6.0`"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "**PostgreSQL 16** (используется образ `postgres:16-alpine`). Развернуто три независимых контейнера с отдельными БД: `transferdb`, `limitdb`, `screeningdb`."
+        }
+      ]
+    }
+  ],
+  "strong": [
+    {
+      "id": "K1-S1",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S2",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S3",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S4",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S5",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S6",
+      "status": "есть",
+      "quote": "настроен в режиме KRaft без Zookeeper"
+    }
+  ],
+  "errors": [
+    {
+      "quote": "выполняет скрининг участников перевода по спискам блокировки (мошенничество, санкции и т.д.)",
+      "category": "искажение",
+      "etalon_ref": "раздел 8, «Частые искажения»: «проверяются участники перевода / получатель»; раздел 2.4, S2",
+      "code_ref": "screening-service ScreeningJournal.check; BlockedSenderRepository.findBySenderId",
+      "explanation": "Скрининг проверяет только отправителя: blockedSenderRepository.findBySenderId(transfer.senderId()). Получатель (recipientId) не проверяется, поэтому «участники перевода» неверно. В строке модуля screening-service ответ сам пишет верно — «Проверяет отправителей»."
+    },
+    {
+      "quote": "управляет резервированием средств на стороне отправителя",
+      "category": "неточность",
+      "etalon_ref": "раздел 8, «Частые искажения»: «резервирование средств / денег»; раздел 1 (движения денег нет)",
+      "code_ref": "limit-service LimitLedger.decide (usage.reserve(amount)); SenderUsage.reserve; Reservation",
+      "explanation": "Резервируется израсходованный лимит отправителя (daily_used / monthly_used в sender_usage), а не средства: денег система не двигает."
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "Maven 3.9.9",
+      "code_ref": "Dockerfile: FROM maven:3.9.9-eclipse-temurin-21 AS poms / AS build",
+      "explanation": "Версия Maven определяется по образу сборки в корневом Dockerfile; в эталоне (раздел 1, стек) не указана."
+    }
+  ],
+  "contamination": [],
+  "notes": "K1-M1(c): в разделе «Назначение» модель пишет «скрининг участников перевода» (записано в errors как искажение по таблице раздела 8), но в строке модуля screening-service верно: «Проверяет отправителей по спискам блокировки». Атом засчитан по верной цитате; при строгом подходе (в группе «Назначение» утверждение неверно) был бы «нет». K1-S6 засчитан погранично по одному элементу — KRaft без ZooKeeper: в пункте нет слова «полностью», ядро — детали развёртывания; портов, healthcheck, Dockerfile с ARG MODULE и томов в ответе нет. K1-S4 не засчитан: Transfer назван рекордом, но об отсутствии зависимостей и родителя Spring Boot не сказано. K1-S2 не засчитан: Kafka Streams в transfer-service упомянут, но группа / application.id = transfer-service не названа. K1-S5 не засчитан: про 201 со статусом NEW и асинхронный итог через GET ничего нет. K1-M1(d) и K1-M2(c) закрыты разными фрагментами ответа. Не записано в errors (сомнительно): «общие классы передачи данных (DTO), такие как рекорд Transfer» — в transfer-common единственный класс Transfer, формулировка намекает на несколько классов, но прямо этого не утверждает; «на основе предопределенных причин (мошенничество, судебные ордера и т.п.)» — решение принимается по факту наличия отправителя в blocked_senders, причина из стоп-листа наружу не передаётся (S2), но прямого противоречия коду нет. Нарушений явных правил промпта и маркеров контаминации не найдено. Расхождений эталона (разделы 1, 5, 8) с кодом не обнаружено."
+}

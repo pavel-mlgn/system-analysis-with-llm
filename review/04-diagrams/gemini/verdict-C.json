@@ -1,0 +1,167 @@
+{
+  "case": "04",
+  "answer_id": "C",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "subgraph TS[\"Контейнер transfer-service: Spring Boot 3.4.1 ... subgraph LSVC[\"Контейнер limit-service ... subgraph SSVC[\"Контейнер screening-service"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "subgraph TDBC[\"Контейнер transfer-db ... subgraph LDBC[\"Контейнер limit-db ... subgraph SDBC[\"Контейнер screening-db"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "subgraph BROKER[\"Контейнер broker ... T_TR[/\"transfers ... T_LR[/\"limit-results ... T_SR[/\"screening-results"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "CLIENT -->|\"HTTP/JSON :8080 ... TC -->|\"Kafka produce: transfers ... LL -->|\"JDBC: jdbc:postgresql://"
+        },
+        {
+          "atom": "e",
+          "status": "есть",
+          "quote": "Сервисы не вызывают друг друга напрямую: они обмениваются сообщением Transfer из transfer-common через топики Kafka"
+        }
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "TTS->>TDB: saveAndFlush TransferEntity status=NEW ... TTS->>TDB: save TransferHistoryEntry stage=NEW ... TC->>K: publishNew() ... TC-->>C: 201 Created"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "par group limit ... and group screening ... and group transfer-tracker"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "K->>KS: limit-results и screening-results с одним ключом id в JoinWindows 10 с ... KS->>TDS: decide(limitResult, screeningResult)"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "K->>TEL: transfers → onEvent(Transfer COMPLETED) ... TEL->>TTS: applyFinalStatus(transfer) ... LEL->>LS: onFinalStatus(transfer)"
+        }
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "par group limit, лимит одобрен ... and group screening, отправитель в стоп-листе ... SS->>K: sendAndWait() → send(screening-results, Transfer DECLINED"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "LL->>LDB: SenderUsage.reserve(amount) ... save Reservation decision=APPROVED, state=RESERVED"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "par group limit, компенсация резерва ... release(amount, reservedOn, today) ... save Reservation state=RELEASED"
+        }
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "4а. БД transferdb (transfer-service) ... 4б. БД limitdb (limit-service) ... 4в. БД screeningdb (screening-service)"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "transfer_history { ... BIGINT transfer_id FK \"NOT NULL, idx_transfer_history_transfer_id\" ... transfers ||--|{ transfer_history : \"FK transfer_id"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "4г. Объекты вне БД ... Transfer { ... Long id \"также ключ Kafka-записи\""
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "sender_usage |o..|{ reservations : \"sender_id, логическая связь без FK\" ... blocked_senders |o..o{ screening_checks : \"sender_id, логическая связь без FK\""
+        }
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "[*] --> NEW : POST /transfers, createTransfer()"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "decision --> COMPLETED : limit APPROVED и screening APPROVED ... decision --> DENIED : limit DECLINED и screening DECLINED ... decision --> CANCELLED : limit DECLINED и screening APPROVED"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "COMPLETED --> [*] ... DENIED --> [*] ... CANCELLED --> [*]"
+        }
+      ]
+    }
+  ],
+  "strong": [
+    {
+      "id": "K4-S1",
+      "status": "есть",
+      "quote": "Если результаты limit и screening не попали в одно окно 10 с, join ничего не публикует.<br/>Перевод остаётся NEW, резерв остаётся RESERVED"
+    },
+    {
+      "id": "K4-S2",
+      "status": "есть",
+      "quote": "Reservation.state ... NONE, COMMITTED и RELEASED — конечные состояния."
+    },
+    {
+      "id": "K4-S3",
+      "status": "есть",
+      "quote": "group transfer-tracker, запись промежуточных результатов ... TEL->>TTS: recordServiceResult ... and group screening ... Note over SEL: только лог, резервов у screening нет"
+    },
+    {
+      "id": "K4-S4",
+      "status": "есть",
+      "quote": "TEH -.->|\"Kafka produce: limit-results.DLT\"| D_LR ... LEH -.->|\"Kafka produce: transfers.DLT\"| D_TR ... SEH -.->|\"Kafka produce: transfers.DLT\"| D_TR"
+    },
+    {
+      "id": "K4-S5",
+      "status": "есть",
+      "quote": "DECIMAL amount \"DECIMAL(15,2) NOT NULL\" ... BIGINT sender_id \"NOT NULL UNIQUE, idx_blocked_senders_sender_id"
+    },
+    {
+      "id": "K4-S6",
+      "status": "есть",
+      "quote": "sender_usage |o..|{ reservations : \"sender_id, логическая связь без FK\""
+    },
+    {
+      "id": "K4-S7",
+      "status": "есть",
+      "quote": "decision --> CANCELLED : иное сочетание статусов, UNEXPECTED_RESULT"
+    }
+  ],
+  "errors": [],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Модель дала исключительно точный ответ, полностью опираясь на предоставленный исходный код."
+}

@@ -1,0 +1,170 @@
+{
+  "case": "01",
+  "answer_id": "D",
+  "mandatory": [
+    {
+      "id": "K1-M1",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Система обрабатывает денежные переводы: принимает заявку на перевод"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "проверяет её по лимитам отправителя (дневной/месячный)"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "и по стоп-листам (заблокированные отправители)"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "после чего выносит финальное решение"
+        }
+      ]
+    },
+    {
+      "id": "K1-M2",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Синхронные вызовы между сервисами: в коде не найдено — межсервисное взаимодействие только через Kafka."
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "его параллельно читают limit-service и screening-service"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "transfer-service через Kafka Streams джойнит оба потока и выносит финальный статус"
+        }
+      ]
+    },
+    {
+      "id": "K1-M3",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "transfer-common … transfer-service … limit-service … screening-service"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "transfer-common | библиотека | внешнего API нет"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "transfer-service | сервис | внешний API есть … limit-service | сервис | внешнего API нет"
+        }
+      ]
+    },
+    {
+      "id": "K1-M4",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Java 21"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "Spring Boot 3.4.1"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Spring Kafka, Kafka Streams"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "Liquibase, PostgreSQL 16"
+        }
+      ]
+    },
+    {
+      "id": "K1-M5",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "transfers | transfer-service … | limit-service (limit), screening-service (screening), transfer-service (transfer-tracker)"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "limit-results | limit-service … | transfer-service Kafka Streams … transfer-service (transfer-tracker) … screening-results | screening-service"
+        }
+      ]
+    },
+    {
+      "id": "K1-M6",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "confluentinc/cp-kafka:7.6.0"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "три инстанса postgres:16-alpine: … transfer-db … limit-db … screening-db"
+        }
+      ]
+    }
+  ],
+  "strong": [
+    {
+      "id": "K1-S1",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S2",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S3",
+      "status": "есть",
+      "quote": "Автосоздание топиков отключено (KAFKA_AUTO_CREATE_TOPICS_ENABLE: \"false\") … топики transfers, limit-results, screening-results с 3 партициями, compact"
+    },
+    {
+      "id": "K1-S4",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S5",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S6",
+      "status": "есть",
+      "quote": "KRaft-режим … порт 5434 … порт 5432 … порт 5433 … сборка многомодульного образа через Dockerfile (multi-stage: poms → build → jre)"
+    }
+  ],
+  "errors": [
+    {
+      "quote": "transfers.DLT, limit-results.DLT, screening-results.DLT | dead-letter recoverer каждого сервиса",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "раздел 8; раздел 11",
+      "code_ref": "limit-service и screening-service не читают топики *-results",
+      "explanation": "Топики *-results.DLT пишет только transfer-service, так как только он является их потребителем, и его recoverer обрабатывает ошибки в этих топиках."
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Модель объединила DLT-топики и приписала их всем сервисам, что классифицируется как мелкая ошибка."
+}

@@ -1,0 +1,83 @@
+{
+  "case": "03",
+  "answer_id": "E",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Эндпоинт: POST /transfers … Эндпоинт: GET /transfers … Эндпоинт: GET /transfers/{id}"},
+        {"atom": "b", "status": "есть", "quote": "| 201 | Перевод создан и сообщение NEW опубликовано | … | 200 | Дубликат с теми же параметрами … | 400 | Ошибка валидации `@Valid` | … | 409 | Перевод с таким id уже существует … | 503 | Kafka"},
+        {"atom": "c", "status": "есть", "quote": "| 200 | Перевод найден | … | 404 | Перевод не найден |"},
+        {"atom": "d", "status": "есть", "quote": "| id | body | integer(int64) | да | Идентификатор перевода | … | amount | body | number | да | Сумма перевода | … | history | array | нет | История изменений |"}
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfers (база: transferdb) … transfer_history (база: transferdb) … sender_usage (база: limitdb) … reservations (база: limitdb) … blocked_senders (база: screeningdb) … screening_checks (база"},
+        {"atom": "b", "status": "есть", "quote": "| amount | DECIMAL(15,2) | нет | нет | нет | да | нет | нет | Сумма перевода |"},
+        {"atom": "c", "status": "есть", "quote": "Таблица: reservations (база: limitdb) … | transfer_id | BIGINT | да | … Таблица: screening_checks (база: screeningdb) … | transfer_id | BIGINT | да |"},
+        {"atom": "d", "status": "есть", "quote": "| transfer_id | BIGINT | нет | transfers(id) | нет | да | нет | idx_transfer_history_transfer_id |"},
+        {"atom": "e", "status": "есть", "quote": "| uq_transfer_history_stage | transfer_id, stage |"},
+        {"atom": "f", "status": "есть", "quote": "Таблица: blocked_senders (база: screeningdb) … | sender_id | BIGINT | нет | нет | да | да | нет | idx_blocked_senders_sender_id |"}
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "| id | Long | нет | Идентификатор перевода | 1001 | … | amount | BigDecimal | нет | Сумма перевода | 15000.00 | … | createdAt | LocalDateTime | нет |"},
+        {"atom": "b", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Канал: transfers … Канал: limit-results … Канал: screening-results … | Число партиций | 3 | … | Политика хранения / очистки | compact |"},
+        {"atom": "b", "status": "есть", "quote": "| Ключ сообщения | Long, `transfer.id()` | … | Сериализация значения | JsonSerializer / JsonDeserializer (Transfer) |"},
+        {"atom": "c", "status": "есть", "quote": "| Отправители | `TransferController.publishNew`; `DecisionTopologyConfig.decisionStream` | … groupId=\"limit\" … groupId=\"screening\" … groupId=\"transfer-tracker\""}
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "| POST /transfers, ответ 500 | не описан | `ApiExceptionHandler.handleUnexpected` возвращает 500 ProblemDetail |"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K3-S1", "status": "есть", "quote": "| version | BIGINT | нет | нет | нет | да | 0 | нет | Версия для оптимистичной блокировки |"},
+    {"id": "K3-S2", "status": "нет", "quote": ""},
+    {"id": "K3-S3", "status": "есть", "quote": "Канал: transfers.DLT … `limit-service.KafkaErrorHandlingConfig`; `screening-service.KafkaErrorHandlingConfig` … Канал: limit-results.DLT … | Отправители | `transfer-service.KafkaErrorHandlingConfig` |"},
+    {"id": "K3-S4", "status": "нет", "quote": ""},
+    {"id": "K3-S5", "status": "есть", "quote": "| state | RESERVED, COMMITTED, RELEASED, NONE |"},
+    {"id": "K3-S6", "status": "есть", "quote": "`transfer-service.DecisionTopologyConfig.decisionStream` (application.id в коде явно не задан)"},
+    {"id": "K3-S7", "status": "есть", "quote": "| GET /transfers/{id}, ответ 400 | не описан | … | TransferRequest.amount, multipleOf 0.01 | multipleOf: 0.01 | `@Digits(integer = 13, fraction = 2)` может отклонить значение"},
+    {"id": "K3-S8", "status": "нет", "quote": ""},
+    {"id": "K3-S9", "status": "нет", "quote": ""}
+  ],
+  "errors": [
+    {
+      "quote": "`TransferController.publishNew` выбрасывает `ResponseStatusException` со статусом 503, но `ApiExceptionHandler.handleUnexpected` перехватывает `Exception` и возвращает `ProblemDetail` со статусом 500",
+      "category": "ложная_аномалия",
+      "etalon_ref": "T4; 6.1 (выдуманные расхождения); раздел 8, «Частые искажения»",
+      "code_ref": "transfer-service ApiExceptionHandler (extends ResponseEntityExceptionHandler); TransferController.publishNew",
+      "explanation": "ResponseStatusException — подкласс ErrorResponseException, который обрабатывает унаследованный ResponseEntityExceptionHandler.handleException; этот обработчик специфичнее @ExceptionHandler(Exception.class), поэтому клиент получает 503, а не 500. Ответ к тому же противоречит собственной таблице кодов POST в разделе 1, где 503 указан верно."
+    },
+    {
+      "quote": "| createdAt | LocalDateTime | нет | Дата и время создания | \"2025-01-01T12:00:00\" |",
+      "category": "неточность",
+      "etalon_ref": "4.4; раздел 8, «Частые искажения» («createdAt в Kafka — ISO-строка»)",
+      "code_ref": "transfer-common Transfer.createdAt; application.yml (value-serializer JsonSerializer по имени класса); DecisionTopologyConfig (new JsonSerde<>(Transfer.class))",
+      "explanation": "JsonSerializer/JsonSerde используют собственный ObjectMapper spring-kafka, LocalDateTime в Kafka пишется массивом [год, месяц, день, час, мин, сек, нано], а не ISO-строкой; пример в формате сообщения неверен."
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "| Сериализация ключа | DelegatingByTypeSerializer (byte[] / Long) | … | Сериализация значения | ByteArraySerializer или JsonSerializer в `DeadLetterPublishingRecoverer` |",
+      "code_ref": "KafkaErrorHandlingConfig.kafkaErrorHandler и keySerializer() во всех трёх сервисах",
+      "explanation": "Для DLT создаются два KafkaTemplate (rawTemplate с ByteArraySerializer и jsonTemplate с JsonSerializer), выбираемые DeadLetterPublishingRecoverer по типу значения; ключ сериализуется DelegatingByTypeSerializer (byte[] → ByteArraySerializer, Long → LongSerializer). В эталоне (F-4) описано содержимое DLT, но не конфигурация сериализаторов."
+    }
+  ],
+  "contamination": [],
+  "notes": "K3-M1(b): 503 в таблице кодов POST (раздел 1) указан верно, поэтому атом засчитан; противоречащее ему утверждение раздела 4 («503 превращается в 500») записано как ложная аномалия один раз. Код 400 для POST описан только как ошибка валидации @Valid, битый JSON не упомянут — неполнота, не ошибка. K3-M3(b): в формате сообщения Transfer поле status дано как String с примером \"NEW\", наборы значений не перечислены (они есть только для history.status в HTTP и БД) — атом не закрыт. K3-S2: в колонке FK для таблиц limitdb и screeningdb стоит «нет», но отсутствие FK как находка и логическая связь reservations.sender_id → sender_usage.sender_id явно не названы — не засчитано по правилу явности. K3-S3: DLT-топики с верными отправителями (transfers.DLT — все три сервиса, *-results.DLT — только transfer-service); кто объявляет, явно не сказано, но ядро пункта закрыто. K3-S7: засчитаны O2 (400 для GET /transfers/{id}) и O8 (multipleOf 0.01 против @Digits fraction=2); O1 (500 не описан) использован для K3-M5. K3-S4, S8 (__TypeId__), S9 (массив createdAt) отсутствуют. Java-типы в разделе 3 соответствуют требованию промпта («типы языка для сообщений»), в HTTP использованы JSON-типы — нарушения формата нет. Расхождений эталона с кодом по проверенным пунктам не обнаружено."
+}

@@ -1,0 +1,183 @@
+{
+  "case": "04",
+  "answer_id": "B",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "subgraph TS[\"transfer-service (Spring Boot, порт 8080)\"] … subgraph LS[\"limit-service (Spring Boot)\"] … subgraph SS[\"screening-service (Spring Boot)\"]"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "subgraph TDB[\"transfer-db (PostgreSQL 16, transferdb)\"] … subgraph LDB[\"limit-db (PostgreSQL 16, limitdb)\"] … subgraph SDB[\"screening-db (PostgreSQL 16, screeningdb)\"]"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "subgraph KAFKA[\"broker (Kafka cp-kafka 7.6.0, KRaft)\"] … KT[[\"transfers\"]] … KL[[\"limit-results\"]] … KS[[\"screening-results\"]]"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "Client -->|\"HTTP/JSON: POST /transfers\"| TC … KT -->|\"Kafka consume: group limit\"| LTL … LSV -->|\"Kafka produce: limit-results, APPROVED/DECLINED\"| KL"
+        },
+        {
+          "atom": "e",
+          "status": "есть",
+          "quote": "Взаимодействие сервисов асинхронное, через топики `transfers`, `limit-results` и `screening-results`; синхронный вход один: REST в `transfer-service`."
+        }
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "TTS->>TDB: transferRepository.saveAndFlush(TransferEntity status NEW) … TC->>K: publishNew … TC-->>Client: 201 Created (TransferEntity, status NEW)"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "par limit-service … K->>LTL: onEvent(Transfer NEW), group limit … and screening-service … K->>STL: onEvent(Transfer NEW), group screening"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "K->>DS: limit-results и screening-results с одним key id … DS->>TDS: decide(limitResult, screeningResult) в окне 10 с"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "K->>TEL: transfers (COMPLETED) … TEL->>TTS: applyFinalStatus(transfer) … K->>LTL: onEvent(Transfer COMPLETED) … LS->>LG: settle(transfer)"
+        }
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "SJ->>SDB: blockedSenderRepository.findBySenderId(senderId), найден … SS->>K: send(screening-results, withDecision(DECLINED, screening, SENDER_BLOCKED))"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "LG->>LDB: save sender_usage, save reservations (state RESERVED) … Note over LDB: Уже выполнено, сумма добавлена в daily_used и monthly_used"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "SenderUsage.release(amount, reservedOn, today), save … LG->>LDB: reservation.markReleased(), save (state RELEASED)"
+        }
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Диаграмма 4а. ER: transferdb (transfer-service) … Диаграмма 4б. ER: limitdb (limit-service) … Диаграмма 4в. ER: screeningdb (screening-service)"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "Связь по внешнему ключу `transfer_history.transfer_id REFERENCES transfers(id)` … transfers ||--|{ transfer_history … Внешних ключей нет, связь по `sender_id` логическая."
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Диаграмма 4г. Объекты, не хранящиеся в БД … Это REST-модели и сообщение Kafka `Transfer` из `transfer-common`."
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "Логические связи между сущностями разных диаграмм (все без FK, через идентификатор): … blocked_senders |o..o{ screening_checks : \"sender_id, логическая\""
+        }
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "[*] --> NEW : POST /transfers, TransferTrackingService.createTransfer"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "NEW --> COMPLETED : limit APPROVED и screening APPROVED … NEW --> DENIED : limit DECLINED и screening DECLINED … NEW --> CANCELLED : limit APPROVED и screening DECLINED, decidedBy screening"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "COMPLETED --> [*] … CANCELLED --> [*] … DENIED --> [*]"
+        }
+      ]
+    }
+  ],
+  "strong": [
+    {
+      "id": "K4-S1",
+      "status": "есть",
+      "quote": "Если результат не пришёл в окно 10 с или ушёл в DLT после 3 повторов, join не срабатывает. Перевод остаётся NEW, резерв остаётся RESERVED."
+    },
+    {
+      "id": "K4-S2",
+      "status": "есть",
+      "quote": "При одобрении в `decide` резерв получает `RESERVED`, при отказе `NONE`. Из `RESERVED` он переходит в `COMMITTED` в `settle` при `COMPLETED` или в `RELEASED` в `settle` при `CANCELLED` и `DENIED`."
+    },
+    {
+      "id": "K4-S3",
+      "status": "есть",
+      "quote": "participant TEL as TransferEventListener … K->>STL: onEvent(Transfer COMPLETED) … Note over STL: только лог, действий нет"
+    },
+    {
+      "id": "K4-S4",
+      "status": "есть",
+      "quote": "LTL -.->|\"DefaultErrorHandler: 3 повтора по 1 с, затем DLT\"| DT … TEL -.->|\"DLT по исходному топику\"| DL … TEL -.->|\"DLT по исходному топику\"| DSL"
+    },
+    {
+      "id": "K4-S5",
+      "status": "есть",
+      "quote": "decimal amount \"DECIMAL(15,2) NOT NULL\" … bigint transfer_id FK \"NOT NULL, UNIQUE(transfer_id, stage)\" … bigint sender_id UK \"NOT NULL UNIQUE, idx_blocked_senders_sender_id\""
+    },
+    {
+      "id": "K4-S6",
+      "status": "есть",
+      "quote": "sender_usage |o..o{ reservations : \"sender_id, логическая\""
+    },
+    {
+      "id": "K4-S7",
+      "status": "есть",
+      "quote": "NEW --> CANCELLED : иная комбинация, messageInfo UNEXPECTED_RESULT"
+    }
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {
+      "quote": "LTL[\"TransferEventsListener (id limit-transfers-listener)\"] … STL[\"TransferEventsListener (id screening-transfers-listener)\"] … TEL[\"TransferEventListener (id transfer-tracker)\"]",
+      "code_ref": "limit-service TransferEventsListener.onEvent; screening-service TransferEventsListener.onEvent; transfer-service TransferEventListener.onEvent (@KafkaListener id)",
+      "explanation": "Идентификаторы слушателей верны: @KafkaListener(id = \"limit-transfers-listener\"), id = \"screening-transfers-listener\", id = \"transfer-tracker\". В эталоне указаны только consumer group."
+    },
+    {
+      "quote": "ScreeningCheck.result** (screeningdb). Значение задаётся один раз (APPROVED или DECLINED), переходов в коде не найдено.",
+      "code_ref": "screening-service ScreeningJournal.check; ScreeningCheck",
+      "explanation": "Результат проверки создаётся один раз в ScreeningJournal.check, при повторном NEW возвращается сохранённая запись; кода, меняющего result, нет."
+    },
+    {
+      "quote": "Справочника отправителей и получателей (`senderId`, `recipientId`) в коде не найдено.",
+      "code_ref": "transfer-service 001-create-tables.sql; limit-service 001-create-tables.sql; screening-service 001-create-tables.sql",
+      "explanation": "Таблиц клиентов/счетов нет ни в одной из трёх БД; sender_id и recipient_id — произвольные BIGINT без ссылок."
+    }
+  ],
+  "contamination": [],
+  "notes": "Ошибок, противоречащих коду, не найдено. Выбран бизнес-отказ с компенсацией (senderId 13 из blocked_senders: резерв RESERVED → settle → SenderUsage.release → RELEASED), поэтому K4-M3 закрыта полностью. K4-S2: состояния резерва даны текстом, а не диаграммой; конечность NONE выражена однозначной конструкцией (переходы перечислены только из RESERVED, NONE → RESERVED нет), засчитано. Переход RESERVED → RELEASED при DENIED верен по коду (LimitLedger.settle), хотя недостижим (L13) — не ошибка. K4-S6: кардинальность |o со стороны sender_usage верна (0..1), но обоснование через INVALID_AMOUNT в ответе не приведено; засчитано по ядру пункта. Со стороны reservations стоит o{ (0..N), в эталоне |{; в схеме FK нет, строку sender_usage без резервов БД не запрещает, поэтому в errors не записано. Сомнительные, но не записанные места: (1) «Этапы NEW, затем LIMIT и SCREENING в любом порядке, затем FINAL» — упрощение: по B8 changedAt у LIMIT/SCREENING может быть позже FINAL; как описание логического порядка этапов допустимо. (2) Подпись DLT «DefaultErrorHandler: 3 повтора по 1 с, затем DLT» верна для ошибок обработки (FixedBackOff(1000, 3)); оговорки, что не десериализуемые сообщения уходят в DLT сразу, нет, но обратного не утверждается. Аналогично в заметке диаграммы 3 «ушёл в DLT после 3 повторов». (3) В заметке диаграммы состояний «Переход выполняет DecisionTopologyConfig.decisionStream»: решение вычисляет Streams, а статус в БД применяет TransferTrackingService.applyFinalStatus — это в ответе сказано в пояснении перед диаграммой. (4) LG->>LG: lazyReset(today) изображён как самовызов LimitLedger, хотя метод принадлежит SenderUsage (вызывается как usage.lazyReset); соседние шаги пишут usage.reserve явно — не считаю приписыванием метода чужому классу. Тексты между диаграммами укладываются в 1–2 предложения; списки после ER и диаграммы состояний прямо требует промпт. Java-типы в ER кейса 4 промпт не запрещает. Синтаксис Mermaid не оценивался. Расхождений эталона с кодом не обнаружено."
+}

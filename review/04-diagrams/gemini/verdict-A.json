@@ -1,0 +1,167 @@
+{
+  "case": "04",
+  "answer_id": "A",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Transfer Service … Limit Service … Screening Service"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "Transfer DB\\n(port 5434) … Limit DB\\n(port 5432) … Screening DB\\n(port 5433)"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Topic: transfers … Topic: limit-results … Topic: screening-results"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "Client -->|\"HTTP POST /transfers\"| TS_API … TS_API -->|\"Producer.send()\"| K_Transfers"
+        },
+        {
+          "atom": "e",
+          "status": "есть",
+          "quote": "LS_App -->|\"Producer.send()\"| K_LimitRes … SS_App -->|\"Producer.send()\"| K_ScreenRes"
+        }
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "createTransfer(request) … send('transfers', Transfer(NEW)) … 201 Created"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "par Limit Validation … and Screening Validation … end"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "DecisionTopologyConfig->>DecisionTopologyConfig: \"TransferDecisionService.decide(limit, screening)\""
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "TopicTransfers->>TransferEventListener: \"onEvent(Transfer(COMPLETED))\" … TopicTransfers->>LimitService: \"onEvent(Transfer(COMPLETED))\""
+        }
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Screening Validation (Failed) … ScreeningJournal.check() -> DECLINED (Blocked)"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "LimitLedger.decide() -> APPROVED … send('limit-results', Transfer(APPROVED))"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "LimitLedger.settle() -> usage.release(), markReleased()"
+        }
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "ER-модель разбита на 4 отдельные диаграммы (по одной на каждую базу данных"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "transfers ||--o{ transfer_history : \"id = transfer_id\""
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "4г. Объекты передачи данных (Kafka Messages / DTOs)"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "В коде нет физических внешних ключей, но есть логическая связь. … sender_usage ||..o{ reservations : \"logical relation (sender_id)\""
+        }
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "[*] --> NEW : \"POST /transfers (TransferTrackingService.createTransfer)\""
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "NEW --> COMPLETED : \"LimitResult == APPROVED\\nScreeningResult == APPROVED\" … NEW --> DENIED"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "COMPLETED --> [*] … DENIED --> [*] … CANCELLED --> [*]"
+        }
+      ]
+    }
+  ],
+  "strong": [
+    {
+      "id": "K4-S1",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K4-S2",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K4-S3",
+      "status": "есть",
+      "quote": "TransferEventListener->>TransferTrackingService: \"applyFinalStatus(CANCELLED)\" … and Screening Ignore \\n TopicTransfers->>ScreeningService: \"onEvent(Transfer(CANCELLED))\""
+    },
+    {
+      "id": "K4-S4",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K4-S5",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K4-S6",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K4-S7",
+      "status": "есть",
+      "quote": "NEW --> CANCELLED : \"Любая другая комбинация (UNEXPECTED_RESULT)\""
+    }
+  ],
+  "errors": [],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Модель предоставила отличный ответ: все диаграммы полностью соответствуют коду, имеют синтаксически корректные экранирования строк для Mermaid, архитектура и процессы описаны детально и безошибочно."
+}

@@ -1,0 +1,8 @@
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.jar -text
+*.zip -text
+*.png -text
+*.jpg -text
+*.gif -text
+*.ico -text

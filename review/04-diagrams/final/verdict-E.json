@@ -1,0 +1,98 @@
+{
+  "case": "04",
+  "answer_id": "E",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "subgraph TransferService[\"transfer-service\"] … subgraph LimitService[\"limit-service\"] … subgraph ScreeningService[\"screening-service\"]"},
+        {"atom": "b", "status": "есть", "quote": "TransferDb[(\"transfer-db: transferdb\")] … LimitDb[(\"limit-db: limitdb\")] … ScreeningDb[(\"screening-db: screeningdb\")]"},
+        {"atom": "c", "status": "есть", "quote": "subgraph Kafka[\"Kafka broker\"] … TopicTransfers[\"Topic: transfers (3 partitions, compact)\"] … TopicLimitResults[\"Topic: limit-results (3 partitions, compact)\"]"},
+        {"atom": "d", "status": "есть", "quote": "User -->|\"HTTP POST /transfers, GET /transfers/{id}\"| TransferController … TopicTransfers -->|\"Kafka consume groupId=limit (NEW и final)\"| LimitTransferEventsListener"},
+        {"atom": "e", "status": "есть", "quote": "LimitServiceClass -->|\"Kafka produce key=id\"| TopicLimitResults … DecisionTopologyConfig -->|\"Kafka Streams consume\"| TopicLimitResults"}
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "TTS->>TR: \"saveAndFlush(TransferEntity status=NEW)\" … TTK->>K: \"produce topic=\\\"transfers\\\" key=id\" … TC-->>Client: \"201 Created TransferEntity status=NEW\""},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "есть", "quote": "K-->>DS: \"stream(\\\"limit-results\\\") join stream(\\\"screening-results\\\")\" … DS->>TDS: \"decide(limitResult, screeningResult)\""},
+        {"atom": "d", "status": "есть", "quote": "K-->>TEL: \"onEvent(Transfer COMPLETED) from \\\"transfers\\\"\" … K-->>LL: \"onEvent(Transfer COMPLETED) groupId=\\\"limit\\\"\" … LS->>LLed: \"settle(transfer)\""}
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Показан отказ публикации в Kafka после сохранения перевода: запись остаётся в БД со статусом `NEW`, клиент получает `503`."},
+        {"atom": "b", "status": "есть", "quote": "Note over TR,THR: \"Уже выполнено: transfers и transfer_history сохранены со статусом NEW\""},
+        {"atom": "c", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "## Диаграмма 4а: ER-диаграмма — transfer-db … ## Диаграмма 4б: ER-диаграмма — limit-db … ## Диаграмма 4в: ER-диаграмма — screening-db"},
+        {"atom": "b", "status": "есть", "quote": "Сущности базы `transferdb`, между `transfers` и `transfer_history` есть FK-связь. … transfers ||--o{ transfer_history : \"transfer_id FK\""},
+        {"atom": "c", "status": "есть", "quote": "## Диаграмма 4г: ER-диаграмма — объекты, не хранящиеся в БД … Показаны `TransferRequest` и `Transfer` — REST-запрос и Kafka-сообщение/ответ."},
+        {"atom": "d", "status": "есть", "quote": "Сущности базы `limitdb`; связь `sender_usage` и `reservations` логическая по `sender_id`, без FK. … sender_usage ||..o{ reservations : \"sender_id логическая\""}
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "[*] --> NEW: \"POST /transfers, TransferTrackingService.createTransfer()\""},
+        {"atom": "b", "status": "есть", "quote": "NEW --> COMPLETED: \"TransferDecisionService.decide: limit=APPROVED и screening=APPROVED … NEW --> CANCELLED: \"limit=DECLINED и screening=APPROVED … NEW --> DENIED: \"limit=DECLINED и screening=DECLINED"},
+        {"atom": "c", "status": "есть", "quote": "COMPLETED --> [*] … CANCELLED --> [*] … DENIED --> [*]"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K4-S1", "status": "нет", "quote": ""},
+    {"id": "K4-S2", "status": "нет", "quote": ""},
+    {"id": "K4-S3", "status": "есть", "quote": "participant TEL as TransferEventListener_transfer … SL->>SL: \"screening holds no reservations, nothing to do\""},
+    {"id": "K4-S4", "status": "есть", "quote": "LimitKafkaErrorHandlingConfig -.->|\"DLT publish on error\"| TopicTransfersDLT … TransferKafkaErrorHandlingConfig -.->|\"DLT publish on error\"| TopicLimitResultsDLT"},
+    {"id": "K4-S5", "status": "нет", "quote": ""},
+    {"id": "K4-S6", "status": "нет", "quote": ""},
+    {"id": "K4-S7", "status": "есть", "quote": "NEW --> CANCELLED: \"limit=DECLINED и screening=APPROVED, или limit=APPROVED и screening=DECLINED, или UNEXPECTED_RESULT\""}
+  ],
+  "errors": [
+    {
+      "quote": "Дополнительно у `Reservation` есть жизненный цикл: `NONE` → `RESERVED` при `approve()`",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "раздел 8, «Частые искажения»: «NONE → RESERVED»; 2.3 (состояния резерва); 9.5",
+      "code_ref": "limit-service Reservation.approve()/decline(); LimitLedger.decide, LimitLedger.settle",
+      "explanation": "approve() вызывается для нового резерва и сразу ставит RESERVED; NONE ставит decline() при отказе, это конечное состояние: settle() для не-RESERVED ничего не делает. Перехода NONE → RESERVED в коде нет"
+    },
+    {
+      "quote": "blocked_senders ||..o{ screening_checks : \"sender_id логическая\"",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "4.3; 9.4 (blocked_senders |o..o{ screening_checks)",
+      "code_ref": "screening-service ScreeningJournal.check; screening-service 001-create-tables.sql",
+      "explanation": "Кардинальность: запись screening_checks создаётся для любого отправителя, а строка blocked_senders есть только у заблокированных. У большинства проверок (APPROVED) связанной строки нет, нужно 0..1 (|o), а не ровно одна (||)"
+    },
+    {
+      "quote": "sender_usage ||..o{ reservations : \"sender_id логическая\"",
+      "category": "неточность",
+      "etalon_ref": "4.2; 9.4 («1 вместо 0..1» — неточность)",
+      "code_ref": "limit-service LimitLedger.decide (ранний return при INVALID_AMOUNT)",
+      "explanation": "При INVALID_AMOUNT резерв сохраняется без загрузки и сохранения sender_usage, поэтому у резерва 0..1 строки счётчиков, а не ровно одна"
+    },
+    {
+      "quote": "TransferRequest ||..|| Transfer : \"REST-запрос создаёт сообщение\"",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "9.4 («Ошибка: … связь TransferRequest ||..|| Transfer как 1:1»)",
+      "code_ref": "transfer-service TransferController.create/duplicate/publishNew; transfer-common Transfer.withDecision",
+      "explanation": "Кардинальность: запрос с 409 или с отказом публикации (503) сообщения не создаёт, повторный POST по NEW публикует NEW заново, а на один transferId в Kafka приходится несколько сообщений Transfer (NEW, два ответа, финал). Связь не 1:1"
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "TC->>TC: \"catch ExecutionException / TimeoutException / KafkaException\"",
+      "code_ref": "transfer-service TransferController.publishNew (константа KAFKA_UNAVAILABLE)",
+      "explanation": "publishNew ловит ExecutionException, TimeoutException и KafkaException (spring и apache), плюс InterruptedException, и бросает ResponseStatusException(503) с текстом «Kafka недоступна, перевод сохранён — повторите запрос с тем же id». Этот текст ответ тоже приводит дословно. В эталоне перечня исключений и точного текста 503 нет"
+    }
+  ],
+  "contamination": [],
+  "notes": "K4-M2(b): `par` нет, явной пометки о параллельности тоже нет; есть только две последовательные доставки из K в LL и SL с разными groupId, а обработка limit и screening нарисована друг за другом. Атом не засчитан. K4-M3: выбран технический отказ (Kafka недоступна → 503). По особому указанию (b) закрыт сохранением NEW, (c) не закрыт. Атом (a) засчитан самим отказом публикации, чтобы итог совпал с правилом чек-листа «технический отказ без компенсации — группа закрыта частично»; иначе выходит 1 из 3 и группа не закрыта, что противоречит чек-листу. Стоит уточнить формулировку атома (a) для технического отказа. K4-S1: ветки «нет пары в окне 10 с» нет нигде, окно JOIN не упоминается. K4-S5: типы обобщённые (DECIMAL, VARCHAR без размерности), NOT NULL не указан, есть только UK на blocked_senders.sender_id. K4-S2 не засчитан из-за ошибки NONE → RESERVED. Сомнительное, в errors не включено: (1) в диаграмме 1 стрелка TransferController → TransferTrackingService подписана «createTransfer / duplicate». duplicate() — приватный метод самого TransferController, у TransferTrackingService его нет. В диаграммах 2–3 модель приписывает duplicate() контроллеру верно, поэтому это скорее небрежная подпись. (2) Заметка в диаграмме 3 «при совпадении параметров и status=NEW вызовет publishNew(existing), иначе 409 CONFLICT» упрощает правило: при тех же параметрах и не-NEW статусе код возвращает 200, а не 409. В контексте сценария перевод остаётся NEW, поэтому неточность только формальная. (3) `transfers ||--o{ transfer_history`: по схеме БД 0..N допустимо, эталон рисует 1..N (запись NEW создаётся всегда). Не штрафуется. (4) Самосвязь `Transfer ||..|| Transfer` (withDecision) условна: из одного NEW получаются два ответа. Отдельно не штрафуется. Расхождений эталона с кодом не обнаружено."
+}

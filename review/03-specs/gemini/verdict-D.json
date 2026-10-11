@@ -1,0 +1,62 @@
+{
+  "case": "03",
+  "answer_id": "D",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Эндпоинт: POST /transfers … Эндпоинт: GET /transfers … Эндпоинт: GET /transfers/{id}"},
+        {"atom": "b", "status": "есть", "quote": "Коды ответа: … 201 … 200 … 400 … 409 … 415 … 500 … 503"},
+        {"atom": "c", "status": "есть", "quote": "Коды ответа: … 200 Перевод найден … 404 Перевод не найден"},
+        {"atom": "d", "status": "есть", "quote": "integer (int64) … number … string … array … object"}
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Таблица: transfers (база: transferdb) … transfer_history … sender_usage (база: limitdb) … reservations … blocked_senders (база: screeningdb) … screening_checks"},
+        {"atom": "b", "status": "есть", "quote": "amount | DECIMAL(15,2)"},
+        {"atom": "c", "status": "есть", "quote": "reservations … transfer_id | BIGINT | да | — | да (PK) … screening_checks … transfer_id | BIGINT | да | — | да (PK)"},
+        {"atom": "d", "status": "есть", "quote": "transfer_history … transfer_id | BIGINT | — | transfers(id)"},
+        {"atom": "e", "status": "есть", "quote": "uq_transfer_history_stage (UNIQUE) | transfer_id, stage"},
+        {"atom": "f", "status": "есть", "quote": "blocked_senders … sender_id | BIGINT | — | — | да … неявный индекс UNIQUE"}
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "id | Long … senderId | Long … recipientId | Long … amount | BigDecimal … currency | String … status | String … decidedBy | String … messageInfo | String … createdAt | LocalDateTime"},
+        {"atom": "b", "status": "есть", "quote": "transfers … NEW … limit-results … APPROVED, DECLINED … transfers … COMPLETED, CANCELLED, DENIED"}
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfers … 3 … cleanup.policy=compact … limit-results … 3 … cleanup.policy=compact … screening-results … 3"},
+        {"atom": "b", "status": "есть", "quote": "Ключ сообщения | Transfer.id (Long) … Сериализация значения | Отправка: JSON через JsonSerializer"},
+        {"atom": "c", "status": "есть", "quote": "Отправители | transfer-service … Получатели … limit-service … группа limit … screening-service … группа screening"}
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "4. РАСХОЖДЕНИЯ КОНТРАКТА API С КОДОМ … Код 500 (все операции) … GET /transfers/{id}: код 400 … TransferRequest.amount: дробная часть"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K3-S1", "status": "есть", "quote": "version | BIGINT | — | — | — | да | 0 | — | Версия строки для оптимистической блокировки (@Version)"},
+    {"id": "K3-S2", "status": "есть", "quote": "reservations … FK | — … screening_checks … FK | —"},
+    {"id": "K3-S3", "status": "есть", "quote": "transfers.DLT … всех трёх сервисов … limit-results.DLT … только в transfer-service … screening-results.DLT … только в transfer-service … Отправители | DeadLetterPublishingRecoverer"},
+    {"id": "K3-S4", "status": "есть", "quote": "Значения полей status / decidedBy / messageInfo по каналам … transfers … NEW … limit-results … APPROVED, DECLINED … transfers … COMPLETED, CANCELLED, DENIED"},
+    {"id": "K3-S5", "status": "есть", "quote": "state | RESERVED, COMMITTED, RELEASED, NONE"},
+    {"id": "K3-S6", "status": "есть", "quote": "группа = application.id, явно не задан, Spring Boot подставляет spring.application.name = transfer-service"},
+    {"id": "K3-S7", "status": "есть", "quote": "GET /transfers/{id}: код 400 … TransferRequest.amount: дробная часть … TransferRequest.currency: значение null"},
+    {"id": "K3-S8", "status": "есть", "quote": "тип передаётся заголовком __TypeId__ = com.example.common.Transfer"},
+    {"id": "K3-S9", "status": "есть", "quote": "ObjectMapper spring-kafka по умолчанию (JsonSerializer / JsonSerde) пишет его массивом чисел: год, месяц, день, час, минута, секунда, наносекунды"}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Отличный ответ, все пункты чек-листа закрыты, включая все сильные пункты. Детально расписаны типы JSON, структура всех БД и особенности сериализации Kafka."
+}

@@ -1,0 +1,168 @@
+{
+  "case": "01",
+  "answer_id": "C",
+  "mandatory": [
+    {
+      "id": "K1-M1",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Система принимает заявки на денежные переводы (отправитель, получатель, сумма, валюта)"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "проверяет, укладывается ли перевод в дневной и месячный лимиты отправителя"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "не заблокирован ли отправитель"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "По итогам обеих проверок перевод получает финальный статус COMPLETED, CANCELLED или DENIED"
+        }
+      ]
+    },
+    {
+      "id": "K1-M2",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Между собой сервисы взаимодействуют только через Kafka … Вызовов между сервисами (HTTP, gRPC и т. п.) в коде не найдено"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "limit-service и screening-service параллельно проверяют его"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "transfer-service объединяет их через Kafka Streams"
+        }
+      ]
+    },
+    {
+      "id": "K1-M3",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "| transfer-common | … | transfer-service | … | limit-service | … | screening-service |"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "transfer-common | библиотека | нет"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "transfer-service | сервис | есть: REST … limit-service | сервис | нет … screening-service | сервис | нет"
+        }
+      ]
+    },
+    {
+      "id": "K1-M4",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Java 21"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "Spring Boot 3.4.1"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Spring for Apache Kafka, Kafka Streams"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "Spring Data JPA / Hibernate, Liquibase (formatted SQL), драйвер PostgreSQL"
+        }
+      ]
+    },
+    {
+      "id": "K1-M5",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "transfers | transfer-service: … | limit-service (limit), screening-service (screening …), transfer-service (transfer-tracker)"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "limit-results | limit-service … | transfer-service: Kafka Streams¹ и transfer-tracker … screening-results | screening-service … | transfer-service: Kafka Streams¹ и transfer-tracker"
+        }
+      ]
+    },
+    {
+      "id": "K1-M6",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Apache Kafka (Confluent cp-kafka 7.6.0)"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "PostgreSQL 16 (postgres:16-alpine): три независимые БД"
+        }
+      ]
+    }
+  ],
+  "strong": [
+    {
+      "id": "K1-S1",
+      "status": "есть",
+      "quote": "transfers.DLT | KafkaErrorHandlingConfig любого из трёх сервисов … limit-results.DLT, screening-results.DLT | KafkaErrorHandlingConfig transfer-service"
+    },
+    {
+      "id": "K1-S2",
+      "status": "есть",
+      "quote": "application.id Kafka Streams явно не задан. По умолчанию Spring Boot берёт spring.application.name, то есть transfer-service."
+    },
+    {
+      "id": "K1-S3",
+      "status": "есть",
+      "quote": "Основные топики имеют 3 партиции и cleanup.policy=compact … Топики создают сами сервисы через бины NewTopic … автосоздание в брокере отключено."
+    },
+    {
+      "id": "K1-S4",
+      "status": "есть",
+      "quote": "Общий контракт сообщений Kafka: record com.example.common.Transfer. … у transfer-common родителя нет."
+    },
+    {
+      "id": "K1-S5",
+      "status": "есть",
+      "quote": "клиент сразу получает 201 со статусом NEW, а итог видит через GET /transfers/{id}"
+    },
+    {
+      "id": "K1-S6",
+      "status": "есть",
+      "quote": "в режиме KRaft … Образы трёх сервисов собираются одним Dockerfile (аргумент MODULE) … volume для него не подключён."
+    }
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {
+      "quote": "Спецификация OpenAPI лежит файлом в ресурсах, а её подключения к сборке (генератор кода, springdoc) в коде не найдено.",
+      "code_ref": "transfer-service/src/main/resources/openapi/transfer-api.yaml, transfer-service/pom.xml",
+      "explanation": "В pom-файлах действительно нет плагинов для генерации кода из OpenAPI или springdoc-openapi-ui для Swagger UI."
+    }
+  ],
+  "contamination": [],
+  "notes": ""
+}

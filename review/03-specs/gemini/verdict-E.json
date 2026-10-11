@@ -1,0 +1,170 @@
+{
+  "case": "03",
+  "answer_id": "E",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Эндпоинт: POST /transfers … Эндпоинт: GET /transfers … Эндпоинт: GET /transfers/{id}"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "201 | Перевод создан … 200 | Дубликат … 400 | Ошибка валидации … 409 | Перевод с таким id уже существует … 503 | Kafka недоступна"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "200 | Перевод найден … 404 | Перевод не найден"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "integer(int64) … number … string … array … object"
+        }
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Таблица: transfers (база: transferdb) … Таблица: transfer_history … Таблица: sender_usage … Таблица: reservations … Таблица: blocked_senders … Таблица: screening_checks"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "amount | DECIMAL(15,2)"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "reservations … transfer_id | BIGINT | да … screening_checks … transfer_id | BIGINT | да"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "transfer_history … transfer_id | BIGINT | нет | transfers(id)"
+        },
+        {
+          "atom": "e",
+          "status": "есть",
+          "quote": "uq_transfer_history_stage | transfer_id, stage"
+        },
+        {
+          "atom": "f",
+          "status": "есть",
+          "quote": "blocked_senders … sender_id | BIGINT | нет | нет | да"
+        }
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "id | Long … senderId | Long … recipientId | Long … amount | BigDecimal … currency | String … status | String … decidedBy | String … messageInfo | String … createdAt | LocalDateTime"
+        },
+        {
+          "atom": "b",
+          "status": "нет",
+          "quote": ""
+        }
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Канал: transfers … Число партиций | 3 … Политика хранения / очистки | compact"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "Ключ сообщения | Long, transfer.id() … Сериализация значения | JsonSerializer / JsonDeserializer (Transfer)"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Отправители | TransferController.publishNew; DecisionTopologyConfig.decisionStream … Получатели | limit-service.TransferEventsListener, groupId=\"limit\""
+        }
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "GET /transfers/{id}, ответ 400 | не описан … TransferRequest.amount, multipleOf 0.01 | multipleOf: 0.01 | @Digits(integer = 13, fraction = 2)"
+        }
+      ]
+    }
+  ],
+  "strong": [
+    {
+      "id": "K3-S1",
+      "status": "есть",
+      "quote": "version | BIGINT | нет | нет | нет | да | 0 | нет | Версия для оптимистичной блокировки"
+    },
+    {
+      "id": "K3-S2",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K3-S3",
+      "status": "есть",
+      "quote": "Канал: transfers.DLT … Отправители | transfer-service.KafkaErrorHandlingConfig; limit-service… screening-service… Канал: limit-results.DLT … Отправители | transfer-service…"
+    },
+    {
+      "id": "K3-S4",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K3-S5",
+      "status": "есть",
+      "quote": "state | RESERVED, COMMITTED, RELEASED, NONE"
+    },
+    {
+      "id": "K3-S6",
+      "status": "есть",
+      "quote": "application.id в коде явно не задан"
+    },
+    {
+      "id": "K3-S7",
+      "status": "есть",
+      "quote": "GET /transfers/{id}, ответ 400 | не описан … TransferRequest.amount, multipleOf 0.01 | multipleOf: 0.01"
+    },
+    {
+      "id": "K3-S8",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K3-S9",
+      "status": "нет",
+      "quote": ""
+    }
+  ],
+  "errors": [
+    {
+      "quote": "TransferController.publishNew выбрасывает ResponseStatusException со статусом 503, но ApiExceptionHandler.handleUnexpected перехватывает Exception и возвращает ProblemDetail со статусом 500",
+      "category": "ложная_аномалия",
+      "etalon_ref": "T4; раздел 8",
+      "code_ref": "transfer-service ApiExceptionHandler; TransferController.publishNew",
+      "explanation": "ResponseStatusException(503) обрабатывает ResponseEntityExceptionHandler, поэтому клиент получает именно 503"
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Модель четко собрала все таблицы, структуры и типы. Верно определила расхождения (GET /transfers/{id} с кодом 400 и ошибку Jackson/Hibernate с @Digits(fraction = 2)). Единственная ошибка — классификация 503 как 500 из-за недооценки приоритета обработчиков Spring (ResponseEntityExceptionHandler)."
+}

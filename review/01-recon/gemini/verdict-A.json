@@ -1,0 +1,170 @@
+{
+  "case": "01",
+  "answer_id": "A",
+  "mandatory": [
+    {
+      "id": "K1-M1",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Система предназначена для обработки финансовых переводов"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "проверяет суточные и месячные лимиты отправителя"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "screening-service | Сервис | Внешний API: нет | Проверяет отправителей по спискам блокировки"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "результаты, которые затем агрегируются (через потоковую обработку Kafka Streams) для принятия итогового решения"
+        }
+      ]
+    },
+    {
+      "id": "K1-M2",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Синхронные вызовы: В коде не найдено (прямые вызовы между микросервисами по HTTP/gRPC отсутствуют, маршрутизация данных происходит исключительно через Kafka)."
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "профильные сервисы параллельно и независимо обрабатывают его"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "результаты, которые затем агрегируются (через потоковую обработку Kafka Streams) для принятия итогового решения"
+        }
+      ]
+    },
+    {
+      "id": "K1-M3",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "transfer-common … transfer-service … limit-service … screening-service"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "transfer-common | Библиотека | Внешний API: нет | Содержит общие классы передачи данных (DTO)"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "transfer-service | Сервис | Внешний API: есть … limit-service | Сервис | Внешний API: нет … screening-service | Сервис | Внешний API: нет"
+        }
+      ]
+    },
+    {
+      "id": "K1-M4",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Java 21"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "Spring Boot 3.4.1 (Spring Web, Spring Data JPA, Spring Kafka)"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Apache Kafka Streams … Apache Kafka"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "Liquibase, PostgreSQL (16-alpine)"
+        }
+      ]
+    },
+    {
+      "id": "K1-M5",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Топик transfers: Отправляет transfer-service … Получают limit-service (группа limit …), screening-service (группа screening …) и transfer-service (группа transfer-tracker"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "Топик limit-results: Отправляет limit-service … Получает transfer-service … Топик screening-results: Отправляет screening-service … Получает transfer-service"
+        }
+      ]
+    },
+    {
+      "id": "K1-M6",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Брокер сообщений: Apache Kafka (используется образ confluentinc/cp-kafka:7.6.0"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "PostgreSQL 16 (используется образ postgres:16-alpine). Развернуто три независимых контейнера с отдельными БД: transferdb, limitdb, screeningdb"
+        }
+      ]
+    }
+  ],
+  "strong": [
+    {
+      "id": "K1-S1",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S2",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S3",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S4",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S5",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S6",
+      "status": "есть",
+      "quote": "Брокер сообщений: Apache Kafka (используется образ confluentinc/cp-kafka:7.6.0, настроен в режиме KRaft без Zookeeper)"
+    }
+  ],
+  "errors": [
+    {
+      "quote": "выполняет скрининг участников перевода",
+      "category": "искажение",
+      "etalon_ref": "раздел 8",
+      "code_ref": "ScreeningJournal.check",
+      "explanation": "Скрининг проверяет только отправителя (senderId), а не всех участников перевода."
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Модель в одном месте пишет про скрининг «участников перевода» (искажение из частых ошибок эталона), но в другом месте исправляется и пишет верно — «отправителей». Засчитана ошибка согласно разделу 8."
+}

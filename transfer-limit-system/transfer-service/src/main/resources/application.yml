@@ -1,0 +1,43 @@
+spring.application.name: transfer-service
+spring.kafka:
+  admin:
+    modify-topic-configs: true
+  consumer:
+    auto-offset-reset: earliest
+    key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+    value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+    properties:
+      spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.LongDeserializer
+      spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+      spring.json.trusted.packages: "*"
+  producer:
+    key-serializer: org.apache.kafka.common.serialization.LongSerializer
+    value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    properties:
+      max.block.ms: 5000
+      request.timeout.ms: 5000
+      delivery.timeout.ms: 10000
+  streams:
+    properties:
+      default.key.serde: org.apache.kafka.common.serialization.Serdes$LongSerde
+      default.value.serde: org.springframework.kafka.support.serializer.JsonSerde
+      spring.json.trusted.packages: "*"
+      default.deserialization.exception.handler: org.apache.kafka.streams.errors.LogAndContinueExceptionHandler
+    state-dir: /tmp/transfer-service-streams
+
+spring.datasource:
+  url: jdbc:postgresql://localhost:5434/transferdb
+  username: postgres
+  password: postgres
+  driver-class-name: org.postgresql.Driver
+
+spring.jpa:
+  open-in-view: false
+  hibernate:
+    ddl-auto: none
+  show-sql: true
+
+spring.liquibase:
+  change-log: classpath:db/changelog/changelog-master.yaml
+
+spring.mvc.problemdetails.enabled: true

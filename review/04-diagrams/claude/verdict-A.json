@@ -1,0 +1,203 @@
+{
+  "case": "04",
+  "answer_id": "A",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "subgraph \"Transfer Service\" … subgraph \"Limit Service\" … subgraph \"Screening Service\""
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "DB_Transfer[(\"Transfer DB\\n(port 5434)\")] … DB_Limit[(\"Limit DB\\n(port 5432)\")] … DB_Screening[(\"Screening DB\\n(port 5433)\")]"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "K_Transfers[[\"Topic: transfers\"]] … K_LimitRes[[\"Topic: limit-results\"]] … K_ScreenRes[[\"Topic: screening-results\"]]"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "Client -->|\"HTTP POST /transfers\"| TS_API … LS_App -->|\"JDBC / JPA\"| DB_Limit … K_Transfers -->|\"@KafkaListener\"| LS_App … K_LimitRes -->|\"KStream.join\"| TS_Streams"
+        },
+        {
+          "atom": "e",
+          "status": "есть",
+          "quote": "LS_App -->|\"Producer.send()\"| K_LimitRes … SS_App -->|\"Producer.send()\"| K_ScreenRes … K_LimitRes -->|\"KStream.join\"| TS_Streams … TS_Streams -->|\"Result stream\"| K_Transfers"
+        }
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "запрос сохраняется, отправляется в Kafka … \"createTransfer(request)\" … \"send('transfers', Transfer(NEW))\" … TransferController-->>Client: \"201 Created\""
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "par Limit Validation … and Screening Validation"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Kafka Streams агрегирует результаты … DecisionTopologyConfig->>DecisionTopologyConfig: \"TransferDecisionService.decide(limit, screening)\""
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "TransferEventListener->>TransferTrackingService: \"applyFinalStatus(COMPLETED)\" … LimitService->>LimitService: \"LimitLedger.settle() -> markCommitted()\""
+        }
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Сценарий отказа по вине скрининга: сервис скрининга находит отправителя в черном списке и отклоняет перевод (`DECLINED`), сервис лимитов при этом одобряет (`APPROVED`)."
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "LimitService->>LimitService: \"LimitLedger.decide() -> APPROVED\" … сервис лимитов возвращает зарезервированные средства"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "and Rollback Limit … LimitService->>LimitService: \"LimitLedger.settle() -> usage.release(), markReleased()\""
+        }
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "#### 4а. Transfer DB (transfer-db) … #### 4б. Limit DB (limit-db) … #### 4в. Screening DB (screening-db)"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "transfers ||--o{ transfer_history : \"id = transfer_id\" … В коде нет физических внешних ключей, но есть логическая связь. … Физических внешних ключей нет"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "#### 4г. Объекты передачи данных (Kafka Messages / DTOs) … Отражает записи (records), не хранящиеся в БД, передаваемые между сервисами."
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "sender_usage ||..o{ reservations : \"logical relation (sender_id)\" … blocked_senders ||..o{ screening_checks : \"logical relation (sender_id)\""
+        }
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "[*] --> NEW : \"POST /transfers (TransferTrackingService.createTransfer)\""
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "NEW --> COMPLETED : \"LimitResult == APPROVED\\nScreeningResult == APPROVED\" … NEW --> DENIED : \"LimitResult == DECLINED\\nScreeningResult == DECLINED\" … NEW --> CANCELLED : \"LimitResult == DECLINED"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "COMPLETED --> [*] … DENIED --> [*] … CANCELLED --> [*]"
+        }
+      ]
+    }
+  ],
+  "strong": [
+    {
+      "id": "K4-S1",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K4-S2",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K4-S3",
+      "status": "есть",
+      "quote": "participant TransferEventListener … TopicLimit->>TransferEventListener: \"onEvent(limit result)\" … and Screening Nothing To Do … and Screening Ignore"
+    },
+    {
+      "id": "K4-S4",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K4-S5",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K4-S6",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K4-S7",
+      "status": "есть",
+      "quote": "NEW --> CANCELLED : \"Любая другая комбинация (UNEXPECTED_RESULT)\""
+    }
+  ],
+  "errors": [
+    {
+      "quote": "TopicTransfers->>LimitService: \"onEvent(Transfer(NEW))\" … TopicTransfers->>ScreeningService: \"onEvent(Transfer(NEW))\"",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "раздел 8, «Частые искажения»: LimitService.onEvent / ScreeningService.onEvent; L1, S1",
+      "code_ref": "limit-service listener/TransferEventsListener.onEvent, service/LimitService (onNewTransfer, onFinalStatus); screening-service listener/TransferEventsListener.onEvent, service/ScreeningService.onNewTransfer",
+      "explanation": "Метода onEvent у LimitService и ScreeningService нет: @KafkaListener onEvent находится в TransferEventsListener каждого сервиса, который вызывает LimitService.onNewTransfer/onFinalStatus и ScreeningService.onNewTransfer. Существующий метод приписан не тому классу; одна и та же ошибка для обоих сервисов (и для финалов COMPLETED/CANCELLED) записана один раз."
+    },
+    {
+      "quote": "а сервис лимитов возвращает зарезервированные средства",
+      "category": "неточность",
+      "etalon_ref": "0.3; раздел 8, «резервирование средств / денег»",
+      "code_ref": "limit-service LimitLedger.decide/settle; SenderUsage.reserve/release",
+      "explanation": "Резервируется и возвращается израсходованный лимит (счётчики dailyUsed/monthlyUsed в sender_usage), а не средства: движения денег в системе нет."
+    },
+    {
+      "quote": "TransferRequest ||..|| Transfer : \"Maps to via TransferTrackingService\"",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "9.4: «Ошибка: … связь TransferRequest ||..|| Transfer как 1:1»",
+      "code_ref": "transfer-service TransferTrackingService.createTransfer (TransferRequest → TransferEntity); TransferController.publishNew (Transfer.newTransfer из TransferEntity); Transfer.withDecision",
+      "explanation": "Кардинальность 1:1 неверна: по одному transferId в Kafka ходит несколько сообщений Transfer (NEW, повторные NEW при дубликатах POST, ответы limit/screening, финалы), а при 503 сообщения может не быть. Кроме того, TransferTrackingService превращает TransferRequest в TransferEntity, а не в Transfer: сообщение строит TransferController.publishNew."
+    },
+    {
+      "quote": "blocked_senders ||..o{ screening_checks : \"logical relation (sender_id)\"",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "9.4 (blocked_senders |o..o{ screening_checks); 4.3; S2",
+      "code_ref": "screening-service ScreeningJournal.check; db/changelog/001-create-tables.sql",
+      "explanation": "Со стороны blocked_senders указано «ровно один», хотя у проверки незаблокированного отправителя (результат APPROVED — основной случай) строки в blocked_senders нет: должно быть 0..1. Неверная кардинальность."
+    },
+    {
+      "quote": "sender_usage ||..o{ reservations : \"logical relation (sender_id)\"",
+      "category": "неточность",
+      "etalon_ref": "9.4: «Неточность (−0,5), а не ошибка: … 1 вместо 0..1»; 4.2; L3",
+      "code_ref": "limit-service LimitLedger.decide (ранний return при INVALID_AMOUNT без загрузки и сохранения SenderUsage)",
+      "explanation": "Со стороны sender_usage указано «ровно один», но при INVALID_AMOUNT для нового отправителя резерв создаётся без строки sender_usage: правильно 0..1. По правилу эталона — неточность."
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "1) Ошибка onEvent у LimitService/ScreeningService записана один раз: эталон (раздел 8) объединяет оба класса в одну строку, и это один и тот же приём (слой TransferEventsListener «схлопнут» в сервис); если считать по классам — две записи. 2) blocked_senders ||..o{ screening_checks отнесено к мелкой ошибке (кардинальность по 0.3), а не к неточности по аналогии с sender_usage: послабление эталона 9.4 касается только sender_usage, где 0 — редкий случай INVALID_AMOUNT; для скрининга 0 — основной случай (APPROVED). При желании можно смягчить до неточности. 3) transfers ||--o{ transfer_history (0..N) вместо эталонного 1..4 в ошибки не записано: схема БД допускает перевод без истории, по коду createTransfer всегда пишет NEW в той же транзакции — менее точно, но не противоречит схеме. 4) Сноска после диаграммы 5 «NONE / RESERVED -> COMMITTED / RELEASED — в зависимости от финального статуса» неоднозначна (можно прочитать как переход из NONE в COMMITTED/RELEASED, что неверно — settle работает только для RESERVED). Конечность NONE не указана, поэтому K4-S2 не засчитан; в ошибки не записано из-за неоднозначности. 5) На компонентной диаграмме узел TS_Service («TransferTrackingService / TransferDecisionService») получает @KafkaListener-связи, хотя слушатель — TransferEventListener, а TransferDecisionService вызывается из Kafka Streams; это группировка узла, а не утверждение о методе, в ошибки не записано. 6) DLT показан одним узлом «DLT Topics (transfers.DLT, etc.)» без продюсеров — K4-S4 не закрыт. Группы потребителей и окно JOIN 10 с нигде не названы; ветки «нет пары в окне» нет (K4-S1). 7) В K4-M2(a) INSERT не показан отдельной стрелкой в БД, но в описании явно «запрос сохраняется», а createTransfer предшествует send и 201 — засчитано. 8) Подпись par-блока «Rollback Limit» — обычное слово для компенсации, не статус ROLLBACK из словаря piomin; контаминацией не считается. 9) Java-типы в ER 4г (Long, BigDecimal) промпт кейса 4 не запрещает, эталон 9.4 использует их же — нарушением формата не считается. Расхождений эталона с кодом не обнаружено; в эталоне 9.4 у ошибки «TransferRequest ||..|| Transfer» категория не указана — выбрана мелкая ошибка (кардинальность)."
+}

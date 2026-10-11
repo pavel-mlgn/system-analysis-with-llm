@@ -1,0 +1,68 @@
+{
+  "case": "03",
+  "answer_id": "A",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Эндпоинт: POST /transfers … Эндпоинт: GET /transfers … Эндпоинт: GET /transfers/{id}"},
+        {"atom": "b", "status": "есть", "quote": "201 … 200 … 400 … 409 … 503"},
+        {"atom": "c", "status": "есть", "quote": "200 | Ресурс с указанным id найден … 404 | Ресурс с указанным id не найден"},
+        {"atom": "d", "status": "есть", "quote": "integer … number … string … array<object>"}
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "sender_usage (база: limitdb) … reservations (база: limitdb) … blocked_senders (база: screeningdb) … screening_checks (база: screeningdb) … transfers (база: transferdb) … transfer_history"},
+        {"atom": "b", "status": "есть", "quote": "daily_used | DECIMAL(15,2) … amount | DECIMAL(15,2)"},
+        {"atom": "c", "status": "есть", "quote": "reservations … transfer_id | BIGINT | да | нет | да (PK) … screening_checks … transfer_id | BIGINT | да | нет | да (PK)"},
+        {"atom": "d", "status": "есть", "quote": "transfer_id | BIGINT | нет | transfers(id)"},
+        {"atom": "e", "status": "есть", "quote": "uq_transfer_history_stage — UNIQUE | transfer_id, stage"},
+        {"atom": "f", "status": "есть", "quote": "sender_id | BIGINT | нет | нет | да | да | — | idx_blocked_senders_sender_id; UNIQUE"}
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "id | Long … senderId | Long … recipientId | Long … amount | BigDecimal … currency | String … status | String … decidedBy | String … messageInfo | String … createdAt | LocalDateTime"},
+        {"atom": "b", "status": "есть", "quote": "известные значения из кода: NEW, APPROVED, DECLINED, COMPLETED, CANCELLED, DENIED"}
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Канал: transfers … 3 … cleanup.policy=compact … Канал: limit-results … 3 … cleanup.policy=compact … Канал: screening-results … 3 … cleanup.policy=compact"},
+        {"atom": "b", "status": "есть", "quote": "Ключ сообщения | Transfer.id() / ключ Kafka Streams; тип Long … Сериализация значения | JsonSerializer<Transfer>"},
+        {"atom": "c", "status": "есть", "quote": "limit-service: TransferEventsListener#onEvent, группа limit; screening-service: TransferEventsListener#onEvent, группа screening; transfer-service: TransferEventListener#onEvent, группа transfer-tracker"}
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "РАСХОЖДЕНИЯ КОНТРАКТА API С КОДОМ … POST /transfers, TransferRequest.currency: nullable … Transfer.updatedAt: nullable … HTTP 500 для API"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K3-S1", "status": "есть", "quote": "version | BIGINT … Версия записи; отображается как @Version в SenderUsage"},
+    {"id": "K3-S2", "status": "есть", "quote": "reservations … FK | нет … screening_checks … FK | нет"},
+    {"id": "K3-S3", "status": "есть", "quote": "Отправители | limit-service, screening-service, transfer-service … Отправители | transfer-service … Отправители | transfer-service"},
+    {"id": "K3-S4", "status": "нет", "quote": ""},
+    {"id": "K3-S5", "status": "есть", "quote": "RESERVED, COMMITTED, RELEASED, NONE — константы Reservation"},
+    {"id": "K3-S6", "status": "есть", "quote": "DecisionTopologyConfig#decisionStream, группа Kafka Streams — в коде не найдена"},
+    {"id": "K3-S7", "status": "есть", "quote": "TransferRequest.currency: nullable … Transfer.updatedAt: nullable"},
+    {"id": "K3-S8", "status": "нет", "quote": ""},
+    {"id": "K3-S9", "status": "нет", "quote": ""}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {
+      "quote": "Сериализация ключа | DelegatingByTypeSerializer: LongSerializer для Long, ByteArraySerializer для byte[]",
+      "code_ref": "KafkaErrorHandlingConfig.java, keySerializer()",
+      "explanation": "Верно описана логика сериализации ключей для DLT-топиков (отсутствует в явном виде в эталоне, но подтверждается кодом)."
+    }
+  ],
+  "contamination": [],
+  "notes": "Модель дала исключительно точный и структурированный ответ. Отсутствие внешних ключей (FK=нет) отражено в таблицах, как и то, что группа Kafka Streams в коде не найдена явно."
+}

@@ -1,0 +1,69 @@
+{
+  "case": "04",
+  "answer_id": "B",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Диаграмма показывает три Spring Boot сервиса ... transfer-service ... limit-service ... screening-service"},
+        {"atom": "b", "status": "есть", "quote": "их базы PostgreSQL ... TDB[\"transfer-db (PostgreSQL 16, transferdb)\"] ... LDB[\"limit-db ... SDB[\"screening-db"},
+        {"atom": "c", "status": "есть", "quote": "брокер Kafka с рабочими и DLT-топиками ... топики transfers, limit-results и screening-results"},
+        {"atom": "d", "status": "есть", "quote": "Client -->|\"HTTP/JSON: POST /transfers\"| TC ... TC -->|\"Kafka produce: transfers, status NEW, key = id\"| KT"},
+        {"atom": "e", "status": "есть", "quote": "Взаимодействие сервисов асинхронное, через топики ... синхронный вход один: REST в transfer-service"}
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "TTS->>TDB: transferRepository.saveAndFlush(TransferEntity status NEW) ... TC->>K: publishNew ... TC-->>Client: 201 Created"},
+        {"atom": "b", "status": "есть", "quote": "par limit-service ... and screening-service"},
+        {"atom": "c", "status": "есть", "quote": "par трекинг результатов ... and решение Kafka Streams ... DS->>TDS: decide(limitResult, screeningResult)"},
+        {"atom": "d", "status": "есть", "quote": "TEL->>TTS: applyFinalStatus(transfer) ... LTL->>LS: onFinalStatus(transfer) ... LS->>LG: settle(transfer)"}
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Отправитель из blocked_senders ... проходит проверку лимитов ... Скрининг отклоняет перевод"},
+        {"atom": "b", "status": "есть", "quote": "LG->>LG: lazyReset, лимиты не превышены, usage.reserve(amount), reservation.approve()"},
+        {"atom": "c", "status": "есть", "quote": "LG->>LDB: usageRepository.findById(senderId), SenderUsage.release(amount, reservedOn, today) ... reservation.markReleased()"}
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Диаграмма 4а. ER: transferdb ... Диаграмма 4б. ER: limitdb ... Диаграмма 4в. ER: screeningdb"},
+        {"atom": "b", "status": "есть", "quote": "Связь по внешнему ключу transfer_history.transfer_id REFERENCES transfers(id)"},
+        {"atom": "c", "status": "есть", "quote": "Диаграмма 4г. Объекты, не хранящиеся в БД ... TransferRequest ... Transfer"},
+        {"atom": "d", "status": "есть", "quote": "Логические связи между сущностями разных диаграмм (все без FK, через идентификатор)"}
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "[*] --> NEW : POST /transfers, TransferTrackingService.createTransfer"},
+        {"atom": "b", "status": "есть", "quote": "NEW --> COMPLETED : limit APPROVED и screening APPROVED ... NEW --> DENIED : limit DECLINED и screening DECLINED"},
+        {"atom": "c", "status": "есть", "quote": "COMPLETED --> [*]\n    CANCELLED --> [*]\n    DENIED --> [*]"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K4-S1", "status": "есть", "quote": "Если join не сработал, перевод остаётся NEW. Таймаут и перевод в отказ в коде не найдены."},
+    {"id": "K4-S2", "status": "есть", "quote": "При одобрении в decide резерв получает RESERVED, при отказе NONE. Из RESERVED он переходит в COMMITTED в settle ... или в RELEASED"},
+    {"id": "K4-S3", "status": "есть", "quote": "K->>STL: onEvent(Transfer COMPLETED)\n        Note over STL: только лог, действий нет"},
+    {"id": "K4-S4", "status": "есть", "quote": "LTL -.->|\"DefaultErrorHandler: 3 повтора по 1 с, затем DLT\"| DT ... TEL -.->|\"DLT по исходному топику\"| DL"},
+    {"id": "K4-S5", "status": "есть", "quote": "decimal amount \"DECIMAL(15,2) NOT NULL\" ... transfer_id FK \"NOT NULL, UNIQUE(transfer_id, stage)\""},
+    {"id": "K4-S6", "status": "есть", "quote": "sender_usage |o..o{ reservations : \"sender_id, логическая\""},
+    {"id": "K4-S7", "status": "есть", "quote": "NEW --> CANCELLED : иная комбинация, messageInfo UNEXPECTED_RESULT"}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {
+      "quote": "Справочника отправителей и получателей (senderId, recipientId) в коде не найдено",
+      "code_ref": "Весь код проекта",
+      "explanation": "Модель верно подметила отсутствие мастер-системы пользователей в проекте."
+    }
+  ],
+  "contamination": [],
+  "notes": "Очень точный и качественный ответ. Модель смогла построить безупречные диаграммы, отразив все тонкости архитектуры, включая внутренние топики Kafka Streams, логические связи в ER и детали распределения DLT."
+}

@@ -1,0 +1,207 @@
+openapi: 3.0.3
+info:
+  title: Transfer Service API
+  version: 1.0.0
+
+paths:
+  /transfers:
+    post:
+      summary: Создать перевод
+      operationId: createTransfer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transfer'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transfer'
+        '400':
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    get:
+      summary: Получить все переводы
+      operationId: getAllTransfers
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transfer'
+
+  /transfers/{id}:
+    get:
+      summary: Получить перевод по ID с историей
+      operationId: getTransferById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferWithHistory'
+        '404':
+          description: Not Found
+
+components:
+  schemas:
+    TransferRequest:
+      type: object
+      required:
+        - id
+        - senderId
+        - recipientId
+        - amount
+      properties:
+        id:
+          type: integer
+          format: int64
+        senderId:
+          type: integer
+          format: int64
+        recipientId:
+          type: integer
+          format: int64
+        amount:
+          type: number
+          format: decimal
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 9999999999999.99
+          multipleOf: 0.01
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          default: "RUB"
+
+    Transfer:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        senderId:
+          type: integer
+          format: int64
+        recipientId:
+          type: integer
+          format: int64
+        amount:
+          type: number
+          format: decimal
+        currency:
+          type: string
+        status:
+          $ref: '#/components/schemas/TransferStatus'
+        decidedBy:
+          type: string
+          nullable: true
+        messageInfo:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    TransferStatus:
+      type: string
+      enum:
+        - NEW
+        - COMPLETED
+        - CANCELLED
+        - DENIED
+
+    TransferWithHistory:
+      type: object
+      properties:
+        transfer:
+          $ref: '#/components/schemas/Transfer'
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/HistoryEntry'
+
+    HistoryEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        transferId:
+          type: integer
+          format: int64
+        stage:
+          type: string
+          enum:
+            - NEW
+            - LIMIT
+            - SCREENING
+            - FINAL
+        status:
+          type: string
+          enum:
+            - NEW
+            - APPROVED
+            - DECLINED
+            - COMPLETED
+            - CANCELLED
+            - DENIED
+        decidedBy:
+          type: string
+          nullable: true
+        messageInfo:
+          type: string
+          nullable: true
+        changedAt:
+          type: string
+
+    Problem:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string

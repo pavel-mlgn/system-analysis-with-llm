@@ -1,0 +1,104 @@
+{
+  "case": "02",
+  "answer_id": "B",
+  "mandatory": [
+    {
+      "id": "K2-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "ТОЧКА ВХОДА: TransferController.create() ... HTTP POST /transfers"},
+        {"atom": "b", "status": "есть", "quote": "ТОЧКА ВХОДА: TransferController.all() ... HTTP GET /transfers ... ТОЧКА ВХОДА: TransferController.getById()"},
+        {"atom": "c", "status": "есть", "quote": "ТОЧКА ВХОДА: TransferEventListener.onEvent() ... входящее сообщение из топиков transfers, limit-results, screening-results; группа transfer-tracker"},
+        {"atom": "d", "status": "есть", "quote": "ТОЧКА ВХОДА: DecisionTopologyConfig.decisionStream() ... соединение событий из limit-results и screening-results"},
+        {"atom": "e", "status": "есть", "quote": "ТОЧКА ВХОДА: TransferEventsListener.onEvent() в limit-service ... Если статус NEW — принять решение ... Если статус не NEW — урегулировать"},
+        {"atom": "f", "status": "есть", "quote": "ТОЧКА ВХОДА: TransferEventsListener.onEvent() в screening-service ... Если статус NEW — выполнить проверку ... Если статус не NEW — ничего не делать"}
+      ]
+    },
+    {
+      "id": "K2-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "APPROVED | APPROVED | COMPLETED | null | null"},
+        {"atom": "b", "status": "есть", "quote": "APPROVED | DECLINED | CANCELLED | screening | screening.messageInfo"},
+        {"atom": "c", "status": "есть", "quote": "DECLINED | APPROVED | CANCELLED | limit | limit.messageInfo"},
+        {"atom": "d", "status": "есть", "quote": "DECLINED | DECLINED | DENIED | null | limit.messageInfo + \"; \" + screening.messageInfo"}
+      ]
+    },
+    {
+      "id": "K2-M3",
+      "atoms": [
+        {"atom": "a", "status": "нет", "quote": ""},
+        {"atom": "b", "status": "есть", "quote": "Если дневное использование + сумма > дневного максимума, перевод отклоняется ... Иначе, если месячное использование + сумма > месячного максимума, перевод отклоняется"},
+        {"atom": "c", "status": "есть", "quote": "dailyUsed + amount <= dailyMax и monthlyUsed + amount <= monthlyMax | APPROVED"},
+        {"atom": "d", "status": "есть", "quote": "Перед проверкой лимитов выполняется ленивый сброс дневного и месячного использования, если сменился день/месяц"},
+        {"atom": "e", "status": "есть", "quote": "Если сумма перевода null или <= 0, перевод отклоняется с причиной INVALID_AMOUNT"}
+      ]
+    },
+    {
+      "id": "K2-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Иначе перевод одобряется, сумма резервируется в дневном и месячном использовании"},
+        {"atom": "b", "status": "есть", "quote": "При финальном статусе COMPLETED резерв помечается COMMITTED"},
+        {"atom": "c", "status": "есть", "quote": "При финальном статусе CANCELLED или DENIED зарезервированная сумма освобождается"},
+        {"atom": "d", "status": "есть", "quote": "При урегулировании, если резерв не в состоянии RESERVED, обработка пропускается"}
+      ]
+    },
+    {
+      "id": "K2-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "При получении события NEW запускается проверка отправителя ... Если отправитель находится в списке заблокированных"},
+        {"atom": "b", "status": "есть", "quote": "проверка отклоняется с причиной SENDER_BLOCKED"},
+        {"atom": "c", "status": "есть", "quote": "При получении события не NEW ничего не делается"}
+      ]
+    },
+    {
+      "id": "K2-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "201 Created — перевод создан ... 200 OK — перевод уже существует ... 409 Conflict — перевод с таким id уже есть"},
+        {"atom": "b", "status": "есть", "quote": "При принятии решения по лимитам, если по transferId уже есть запись, возвращается ранее сохранённое решение ... Если по transferId уже есть запись проверки, возвращается ранее сохранённый результат"},
+        {"atom": "c", "status": "есть", "quote": "Результат этапа LIMIT/SCREENING записывается только если ... запись по этому этапу ещё не существует ... Финальный статус применяется только если ... запись этапа FINAL ещё не существует"}
+      ]
+    },
+    {
+      "id": "K2-M7",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Окно join 10 секунд без grace period ... Финальное решение не формируется, перевод остаётся в NEW"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K2-S1", "status": "нет", "quote": ""},
+    {"id": "K2-S2", "status": "нет", "quote": ""},
+    {"id": "K2-S3", "status": "есть", "quote": "Компактизация топика transfers ... Consumer group запускается позже, после перезаписи NEW финальным статусом ... limit/screening могут не увидеть NEW и не создать резерв/проверку"},
+    {"id": "K2-S4", "status": "нет", "quote": ""},
+    {"id": "K2-S5", "status": "нет", "quote": ""},
+    {"id": "K2-S6", "status": "нет", "quote": ""},
+    {"id": "K2-S7", "status": "есть", "quote": "любая иная комбинация | любая иная комбинация | CANCELLED | null | UNEXPECTED_RESULT: limit=..., screening=..."},
+    {"id": "K2-S8", "status": "есть", "quote": "Освобождение использования ... совпадает с today ... уменьшается на amount, не ниже 0 ... не совпадает ... не уменьшается"},
+    {"id": "K2-S9", "status": "есть", "quote": "Идемпотентность по transferId без проверки параметров ... В топик попадает NEW с тем же id, но другими суммой/отправителем | limit/screening вернут старое решение"}
+  ],
+  "errors": [
+    {
+      "quote": "ApiExceptionHandler перехватывает ResponseStatusException и возвращает 500 вместо 503",
+      "category": "ложная_аномалия",
+      "etalon_ref": "T4; раздел 8",
+      "code_ref": "transfer-service ApiExceptionHandler; TransferController.publishNew",
+      "explanation": "ResponseStatusException(503) перехватывается стандартным ResponseEntityExceptionHandler, поэтому клиент получает корректную ошибку 503."
+    },
+    {
+      "quote": "Склейка messageInfo при обоих DECLINED может дать null ... В истории и API появляется null; ... или null; null",
+      "category": "ложная_аномалия",
+      "etalon_ref": "2.2 Решение JOIN; L3, L6, S2",
+      "code_ref": "LimitLedger.decide; ScreeningJournal.check; TransferDecisionService.decide",
+      "explanation": "При отказах по лимитам или скринингу причина (reason) всегда заполнена (INVALID_AMOUNT, DAILY_LIMIT_EXCEEDED, MONTHLY_LIMIT_EXCEEDED, SENDER_BLOCKED), поэтому null в сообщении невозможен."
+    },
+    {
+      "quote": "settle при CANCELLED/DENIED требует наличия SenderUsage ... Запись usage отсутствует | NoSuchElementException",
+      "category": "ложная_аномалия",
+      "etalon_ref": "2.3 limit-service",
+      "code_ref": "LimitLedger.settle; LimitLedger.decide",
+      "explanation": "Сценарий settle с вызовом release() выполняется только для резервов в статусе RESERVED. А при создании RESERVED запись SenderUsage сохраняется всегда, и ее удаление в коде отсутствует."
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Модель отлично описала все бизнес-правила и составила подробные таблицы принятия решений, но добавила 3 выдуманных технических аномалии."
+}

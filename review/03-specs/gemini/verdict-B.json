@@ -1,0 +1,70 @@
+{
+  "case": "03",
+  "answer_id": "B",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Эндпоинт: POST /transfers ... Эндпоинт: GET /transfers ... Эндпоинт: GET /transfers/{id}"},
+        {"atom": "b", "status": "есть", "quote": "Коды ответа: ... 201 ... 200 ... 400 ... 409 ... 503 ... 500"},
+        {"atom": "c", "status": "есть", "quote": "Коды ответа: ... 200 Перевод найден | 404 Перевод не найден ... 400 ... 500"},
+        {"atom": "d", "status": "есть", "quote": "integer (int64) ... number ... string ... array of object"}
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Таблица: transfers (база: transferdb) ... transfer_history (база: transferdb) ... sender_usage (база: limitdb) ... reservations (база: limitdb) ... blocked_senders ... screening_checks"},
+        {"atom": "b", "status": "есть", "quote": "DECIMAL(15,2)"},
+        {"atom": "c", "status": "есть", "quote": "reservations ... | transfer_id | BIGINT | да | — | да (PK) ... screening_checks ... | transfer_id | BIGINT | да | — | да (PK)"},
+        {"atom": "d", "status": "есть", "quote": "| transfer_id | BIGINT | — | transfers(id) |"},
+        {"atom": "e", "status": "есть", "quote": "uq_transfer_history_stage (UNIQUE) | transfer_id, stage"},
+        {"atom": "f", "status": "есть", "quote": "| sender_id | BIGINT | — | — | да | да | — | idx_blocked_senders_sender_id + неявный уникальный индекс |"}
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "id Long ... senderId Long ... recipientId Long ... amount BigDecimal ... currency String ... status String ... decidedBy String ... messageInfo String ... createdAt LocalDateTime"},
+        {"atom": "b", "status": "есть", "quote": "Значения полей по каналам: ... status ... NEW ... COMPLETED ... DENIED ... CANCELLED ... APPROVED, DECLINED"}
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Канал: transfers ... Число партиций 3 ... cleanup.policy = compact ... limit-results ... screening-results"},
+        {"atom": "b", "status": "есть", "quote": "Ключ сообщения Transfer.id (Long) ... Сериализация значения JSON: JsonSerializer / JsonDeserializer"},
+        {"atom": "c", "status": "есть", "quote": "Отправители transfer-service ... Получатели limit-service: TransferEventsListener.onEvent, группа \"limit\" ... screening-service ... группа \"screening\" ... transfer-service ... \"transfer-tracker\""}
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "РАСХОЖДЕНИЯ КОНТРАКТА API С КОДОМ ... POST /transfers — код 500 Не описан ... GET /transfers/{id} — код 400 Не описан"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K3-S1", "status": "есть", "quote": "version BIGINT ... Версия для оптимистической блокировки (@Version)"},
+    {"id": "K3-S2", "status": "есть", "quote": "reservations ... | transfer_id | BIGINT | да | — | да (PK) | ... sender_usage ... | sender_id | BIGINT | да | — | да (PK) |"},
+    {"id": "K3-S3", "status": "есть", "quote": "Канал: transfers.DLT ... Объявление KafkaErrorHandlingConfig.transfersDlt в transfer-service, limit-service и screening-service ... limit-results.DLT, screening-results.DLT ... только в transfer-service"},
+    {"id": "K3-S4", "status": "есть", "quote": "Статус, набор значений зависит от канала ... NEW ... COMPLETED ... DENIED ... CANCELLED ... APPROVED, DECLINED"},
+    {"id": "K3-S5", "status": "есть", "quote": "state | RESERVED, COMMITTED, RELEASED, NONE"},
+    {"id": "K3-S6", "status": "есть", "quote": "application.id явно не задан, требует уточнения: по умолчанию Spring Boot берёт spring.application.name = transfer-service"},
+    {"id": "K3-S7", "status": "есть", "quote": "GET /transfers/{id} — код 400 Не описан ... Transfer.updatedAt — nullable Не помечено как nullable"},
+    {"id": "K3-S8", "status": "есть", "quote": "Заголовки | __TypeId__ — добавляется JsonSerializer/JsonSerde по умолчанию"},
+    {"id": "K3-S9", "status": "нет", "quote": ""}
+  ],
+  "errors": [
+    {
+      "quote": "Время создания перевода, строка ISO-8601",
+      "category": "неточность",
+      "etalon_ref": "4.4; раздел 8",
+      "code_ref": "transfer-common Transfer",
+      "explanation": "В Kafka LocalDateTime сериализуется стандартным JsonSerializer без настроек, поэтому в сообщениях он представлен как массив, а не как ISO-строка."
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Модель дала отличный ответ с очень высокой детализацией. Отсутствие FK внутри limitdb и screeningdb (K3-S2) модель корректно выразила прочерками в колонке FK для соответствующих таблиц."
+}

@@ -1,0 +1,63 @@
+{
+  "case": "04",
+  "answer_id": "D",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "subgraph TS[\"Контейнер: transfer-service\"] … subgraph LS[\"Контейнер: limit-service\"] … subgraph SS[\"Контейнер: screening-service\"]"},
+        {"atom": "b", "status": "есть", "quote": "subgraph TDB[\"Контейнер: transfer-db — PostgreSQL … subgraph LDB[\"Контейнер: limit-db … subgraph SDB[\"Контейнер: screening-db"},
+        {"atom": "c", "status": "есть", "quote": "subgraph KAFKA[\"Контейнер: broker — Kafka\"] … TRANSFERS[\"topic: transfers\"] … LIMIT_RESULTS[\"topic: limit-results\"]"},
+        {"atom": "d", "status": "есть", "quote": "CLIENT -->|\"HTTP REST / POST /transfers; GET /transfers; GET /transfers/{id}\"| TC … TC -->|\"Kafka PLAINTEXT / broker:29092 / topic transfers"},
+        {"atom": "e", "status": "есть", "quote": "TC -->|\"Kafka PLAINTEXT / broker:29092 / topic transfers / key Long / value Transfer JSON\"| TRANSFERS … TRANSFERS -->|\"Kafka consumer … TransferEventsListener.onEvent\"| LEL"}
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "TTS->>TDB: \"saveAndFlush TransferEntity со status NEW\" … TC->>K: \"TransferController.publishNew → topic transfers → Transfer status NEW\" … TC-->>C: \"HTTP 201 Created"},
+        {"atom": "b", "status": "есть", "quote": "Note over K,SL: \"limit-service и screening-service получают NEW независимо; порядок обработки между ними не задан\""},
+        {"atom": "c", "status": "есть", "quote": "K-->>DT: \"Kafka Streams input topic limit-results\" … K-->>DT: \"Kafka Streams input topic screening-results\" … DT->>DS: \"TransferDecisionService.decide\""},
+        {"atom": "d", "status": "есть", "quote": "K-->>TEL: \"topic transfers / status COMPLETED\" … TEL->>TTS: \"TransferTrackingService.applyFinalStatus\" … K-->>LL: \"topic transfers / status COMPLETED\" … LL->>LS: \"LimitService.onFinalStatus\""}
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "K-->>DT: \"Kafka Streams input screening-results = DECLINED\" … DT->>DS: \"TransferDecisionService.decide\" … DS-->>DT: \"Transfer status CANCELLED, decidedBy screening, messageInfo SENDER_BLOCKED\""},
+        {"atom": "b", "status": "есть", "quote": "LLED->>LDB: \"SenderUsage.reserve → dailyUsed и monthlyUsed увеличены\" … LLED->>LDB: \"Reservation.approve → state RESERVED\""},
+        {"atom": "c", "status": "есть", "quote": "LLED->>LDB: \"SenderUsage.release → компенсировать ранее зарезервированную сумму\" … LLED->>LDB: \"Reservation.markReleased → state RELEASED\""}
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "erDiagram\n    TRANSFERS { … } … TRANSFER_HISTORY { … } … erDiagram\n    SENDER_USAGE { … } … RESERVATIONS { … }"},
+        {"atom": "b", "status": "есть", "quote": "TRANSFERS ||--o{ TRANSFER_HISTORY : \"FK transfer_history.transfer_id → transfers.id\""},
+        {"atom": "c", "status": "есть", "quote": "TRANSFER_MESSAGE {\n        Long id\n        Long senderId\n        Long recipientId\n        BigDecimal amount\n        String currency\n        String status"},
+        {"atom": "d", "status": "есть", "quote": "SENDER_USAGE |o..o{ RESERVATIONS : \"логическая связь по sender_id; FK в коде не найден\""}
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "[*] --> NEW : \"TransferTrackingService.createTransfer → status NEW\""},
+        {"atom": "b", "status": "есть", "quote": "NEW --> COMPLETED : \"limit=APPROVED и screening=APPROVED … NEW --> DENIED : \"limit=DECLINED и screening=DECLINED"},
+        {"atom": "c", "status": "есть", "quote": "COMPLETED --> [*] : \"финальное состояние\"\n    CANCELLED --> [*] : \"финальное состояние\"\n    DENIED --> [*] : \"финальное состояние\""}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K4-S1", "status": "нет", "quote": ""},
+    {"id": "K4-S2", "status": "есть", "quote": "approve → RESERVED;\n        decline → NONE;\n        RESERVED + COMPLETED → COMMITTED;\n        RESERVED + CANCELLED или DENIED → RELEASED."},
+    {"id": "K4-S3", "status": "есть", "quote": "Note over SL: \"screening.TransferEventsListener только логирует финальный статус; резервов у screening нет\""},
+    {"id": "K4-S4", "status": "есть", "quote": "LKEH -.->|\"Kafka / transfers.DLT / исходная partition\"| TRANSFERS_DLT … TKEH -.->|\"Kafka / limit-results.DLT\"| LIMIT_RESULTS_DLT"},
+    {"id": "K4-S5", "status": "нет", "quote": ""},
+    {"id": "K4-S6", "status": "есть", "quote": "SENDER_USAGE |o..o{ RESERVATIONS : \"логическая связь по sender_id; FK в коде не найден\""},
+    {"id": "K4-S7", "status": "есть", "quote": "NEW --> CANCELLED : \"любая иная комбинация результатов → messageInfo UNEXPECTED_RESULT\""}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Модель дала исключительно точный ответ, безошибочно разобрав архитектуру event-driven взаимодействия, Kafka Streams JOIN, DLT маршрутизацию и кардинальность логических связей."
+}

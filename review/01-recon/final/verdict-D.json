@@ -1,0 +1,192 @@
+{
+ "case": "01",
+ "answer_id": "D",
+ "mandatory": [
+  {
+   "id": "K1-M1",
+   "atoms": [
+    {
+     "atom": "a",
+     "status": "есть",
+     "quote": "Система обрабатывает денежные переводы: принимает заявку на перевод"
+    },
+    {
+     "atom": "b",
+     "status": "есть",
+     "quote": "проверяет её по лимитам отправителя (дневной/месячный)"
+    },
+    {
+     "atom": "c",
+     "status": "есть",
+     "quote": "и по стоп-листам (заблокированные отправители)"
+    },
+    {
+     "atom": "d",
+     "status": "есть",
+     "quote": "проверяет её по лимитам отправителя (дневной/месячный) и по стоп-листам (заблокированные отправители), после чего выносит финальное решение — выполнить, отклонить или отменить перевод"
+    }
+   ]
+  },
+  {
+   "id": "K1-M2",
+   "atoms": [
+    {
+     "atom": "a",
+     "status": "есть",
+     "quote": "Событийно-ориентированная (event-driven) микросервисная архитектура на Kafka … в коде не найдено — межсервисное взаимодействие только через Kafka."
+    },
+    {
+     "atom": "b",
+     "status": "есть",
+     "quote": "его параллельно читают `limit-service` и `screening-service`, публикуя решения в `limit-results` и `screening-results`"
+    },
+    {
+     "atom": "c",
+     "status": "есть",
+     "quote": "`transfer-service` через Kafka Streams джойнит оба потока и выносит финальный статус"
+    }
+   ]
+  },
+  {
+   "id": "K1-M3",
+   "atoms": [
+    {
+     "atom": "a",
+     "status": "есть",
+     "quote": "Родительский `pom.xml` агрегирует все 4 модуля."
+    },
+    {
+     "atom": "b",
+     "status": "есть",
+     "quote": "**transfer-common** | библиотека | внешнего API нет"
+    },
+    {
+     "atom": "c",
+     "status": "есть",
+     "quote": "**transfer-service** | сервис | внешний API есть (`/transfers`, REST) … **limit-service** | сервис | внешнего API нет … **screening-service** | сервис | внешнего API нет"
+    }
+   ]
+  },
+  {
+   "id": "K1-M4",
+   "atoms": [
+    {
+     "atom": "a",
+     "status": "есть",
+     "quote": "Java 21"
+    },
+    {
+     "atom": "b",
+     "status": "есть",
+     "quote": "Spring Boot 3.4.1"
+    },
+    {
+     "atom": "c",
+     "status": "есть",
+     "quote": "Spring Kafka, Kafka Streams … Confluent cp-kafka 7.6.0"
+    },
+    {
+     "atom": "d",
+     "status": "есть",
+     "quote": "Liquibase, PostgreSQL 16"
+    }
+   ]
+  },
+  {
+   "id": "K1-M5",
+   "atoms": [
+    {
+     "atom": "a",
+     "status": "есть",
+     "quote": "`transfers` | transfer-service (`TransferController.publishNew`), также transfer-service Kafka Streams … limit-service (`limit`), screening-service (`screening`), transfer-service (`transfer-tracker`)"
+    },
+    {
+     "atom": "b",
+     "status": "есть",
+     "quote": "`limit-results` | limit-service … transfer-service Kafka Streams (`DecisionTopologyConfig`), transfer-service (`transfer-tracker`) … `screening-results` | screening-service"
+    }
+   ]
+  },
+  {
+   "id": "K1-M6",
+   "atoms": [
+    {
+     "atom": "a",
+     "status": "есть",
+     "quote": "**Kafka**: `confluentinc/cp-kafka:7.6.0`"
+    },
+    {
+     "atom": "b",
+     "status": "есть",
+     "quote": "**PostgreSQL**: три инстанса `postgres:16-alpine`: … `transfer-db` → `transferdb` … `limit-db` → `limitdb` … `screening-db` → `screeningdb`"
+    }
+   ]
+  }
+ ],
+ "strong": [
+  {
+   "id": "K1-S1",
+   "status": "нет",
+   "quote": ""
+  },
+  {
+   "id": "K1-S2",
+   "status": "нет",
+   "quote": ""
+  },
+  {
+   "id": "K1-S3",
+   "status": "есть",
+   "quote": "топики `transfers`, `limit-results`, `screening-results` с 3 партициями, compact; DLT-топики). Автосоздание топиков отключено (`KAFKA_AUTO_CREATE_TOPICS_ENABLE: \"false\"`)."
+  },
+  {
+   "id": "K1-S4",
+   "status": "нет",
+   "quote": ""
+  },
+  {
+   "id": "K1-S5",
+   "status": "нет",
+   "quote": ""
+  },
+  {
+   "id": "K1-S6",
+   "status": "есть",
+   "quote": "`confluentinc/cp-kafka:7.6.0` (KRaft-режим, один узел `broker` … `transferdb` (порт 5434) … сборка многомодульного образа через `Dockerfile` (multi-stage: poms → build → jre)"
+  }
+ ],
+ "errors": [
+  {
+   "quote": "transfers.DLT, limit-results.DLT, screening-results.DLT | dead-letter recoverer каждого сервиса",
+   "category": "мелкая_ошибка",
+   "etalon_ref": "раздел 8; раздел 11",
+   "code_ref": "limit-service и screening-service не читают топики *-results",
+   "explanation": "Топики *-results.DLT пишет только transfer-service, так как только он является их потребителем, и его recoverer обрабатывает ошибки в этих топиках.",
+   "source": "gemini-верификатор, подтверждено автором"
+  }
+ ],
+ "outside_etalon_correct": [
+  {
+   "quote": "Java 21, Maven 3.9.9, Spring Boot 3.4.1",
+   "code_ref": "Dockerfile: FROM maven:3.9.9-eclipse-temurin-21 AS poms / AS build",
+   "explanation": "Версия Maven определена по образу сборочных стадий Dockerfile; в эталоне Maven не упомянут."
+  },
+  {
+   "quote": "сборка многомодульного образа через `Dockerfile` (multi-stage: poms → build → jre)",
+   "code_ref": "Dockerfile: стадии poms, build (maven:3.9.9-eclipse-temurin-21), финальная eclipse-temurin:21-jre",
+   "explanation": "Состав стадий Dockerfile назван верно; эталон говорит только о «многостадийном Dockerfile с ARG MODULE»."
+  },
+  {
+   "quote": "limit-service (`LimitService.sendAndWait`) … screening-service (`ScreeningService.sendAndWait`)",
+   "code_ref": "limit-service LimitService.sendAndWait; screening-service ScreeningService.sendAndWait",
+   "explanation": "Публикация в limit-results и screening-results действительно идёт из приватных методов sendAndWait (send(...).get(10, SECONDS)); в эталоне эти методы не названы."
+  },
+  {
+   "quote": "KRaft-режим, один узел `broker`",
+   "code_ref": "docker-compose.yml, сервис broker: KAFKA_NODE_ID: 1, KAFKA_PROCESS_ROLES: broker,controller, KAFKA_CONTROLLER_QUORUM_VOTERS: 1@broker:29093",
+   "explanation": "Кластер Kafka из одного узла, совмещающего роли broker и controller; эталон говорит только о KRaft без ZooKeeper."
+  }
+ ],
+ "contamination": [],
+ "notes": "Ошибок, противоречащих коду, не найдено. Спорные места, не внесённые в errors: (1) Строка таблицы «`transfers.DLT`, `limit-results.DLT`, `screening-results.DLT` | dead-letter recoverer каждого сервиса» допускает прочтение «все сервисы пишут во все три DLT» (по разделу 8 это мелкая ошибка: `*-results.DLT` пишет только transfer-service, т. к. limit- и screening-service читают только `transfers`, а recoverer пишет в `<топик>.DLT`). Но явного утверждения «limit/screening пишут в *-results.DLT» нет, можно прочитать и как «у каждого сервиса свой recoverer», поэтому в errors не записано; K1-S1 не засчитан, так как распределение DLT по сервисам не указано. (2) «Родительский `pom.xml` агрегирует все 4 модуля» — корневой pom.xml только агрегатор (packaging pom), родителем модулей не является (у сервисов parent spring-boot-starter-parent, у transfer-common родителя нет). Наследование от корневого pom в ответе не утверждается, поэтому считаю это вольным словоупотреблением, не ошибкой. (3) «сборка многомодульного образа» — Dockerfile с ARG MODULE собирает по отдельному образу на модуль; формулировку можно понять как «образ многомодульного проекта», в errors не записано. (4) «NEW → LIMIT → SCREENING → FINAL» перечисляет этапы HistoryStage верно; стрелки можно понять как фиксированный порядок LIMIT раньше SCREENING, хотя на практике порядок произвольный (F-12, B8). Явного утверждения о порядке нет. (5) K1-S3 засчитан по двум из трёх элементов (автосоздание выключено с ключом KAFKA_AUTO_CREATE_TOPICS_ENABLE, compact с 3 партициями); что топики объявляет каждый сервис (TopicsConfig в трёх сервисах), в ответе не сказано. В пункте нет слова «полностью», поэтому засчитан по ядру; при более строгом прочтении его можно снять. (6) K1-S6 засчитан по портам БД, KRaft и многостадийному Dockerfile; healthcheck, ARG MODULE и тома не названы (слова «полностью» в пункте нет). (7) K1-S4: сказано только «Общий record `Transfer`», без упоминания, что у модуля нет зависимостей и родителя Spring Boot, поэтому не засчитан. Расхождений эталона с кодом в разделах 1, 5, 8 и чек-листе кейса 1 не обнаружено. | Решение автора: добавлена мелкая ошибка «все DLT пишет каждый сервис» (нашёл Gemini-верификатор; *-results.DLT объявлены только в transfer-service)."
+}

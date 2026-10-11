@@ -1,0 +1,97 @@
+{
+  "case": "05",
+  "answer_id": "E",
+  "mandatory": [
+    {
+      "id": "K5-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "При вызове метода принятия решения LimitLedger.decide() … При поступлении перевода, если его сумма (amount) строго больше … система должна отклонить"},
+        {"atom": "b", "status": "есть", "quote": "Для нового правила использовать код причины отклонения (reason): SINGLE_LIMIT_EXCEEDED"},
+        {"atom": "c", "status": "есть", "quote": "если его сумма (amount) строго больше значения single_transfer_max из БД"},
+        {"atom": "d", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K5-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "перевод получает финальный статус CANCELLED, decidedBy = limit, messageInfo = SINGLE_LIMIT_EXCEEDED"},
+        {"atom": "b", "status": "есть", "quote": "система должна отклонить резервацию без обновления счетчиков SenderUsage"},
+        {"atom": "c", "status": "есть", "quote": "система должна отклонить резервацию"}
+      ]
+    },
+    {
+      "id": "K5-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Добавить новую таблицу global_limits"},
+        {"atom": "b", "status": "есть", "quote": "Текущие значения … перенести в миграцию как начальные значения. Значение для single_transfer_max необходимо запросить у бизнеса"},
+        {"atom": "c", "status": "есть", "quote": "Убрать чтение лимитов через @Value в классе LimitLedger"}
+      ]
+    },
+    {
+      "id": "K5-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Разместить API и хранилище непосредственно в limit-service. Обоснование: Сервис limit-service является владельцем домена лимитов"},
+        {"atom": "b", "status": "есть", "quote": "Для этого потребуется добавить зависимость spring-boot-starter-web в limit-service/pom.xml"},
+        {"atom": "c", "status": "есть", "quote": "Эндпоинт 1: GET /limits … Эндпоинт 2: PUT /limits"},
+        {"atom": "d", "status": "есть", "quote": "Коды ответа: … 400 Ошибка валидации (отрицательные суммы)"}
+      ]
+    },
+    {
+      "id": "K5-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "5.2. transfer-service Изменений нет … 5.3. screening-service Изменений нет … 5.4. transfer-common Изменений нет"},
+        {"atom": "b", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K5-M6",
+      "atoms": [
+        {"atom": "a", "status": "нет", "quote": ""},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "есть", "quote": "PUT /limits с корректными данными изменяет настройки в БД … проверить без рестарта приложения"},
+        {"atom": "d", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K5-M7",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Какое значение для «максимальной суммы одного перевода» (single_transfer_max) нужно установить"},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "есть", "quote": "Доступ к PUT /limits будет открыт всем … Допустимо ли это в рамках внутренней сети, или требуется базовая авторизация"},
+        {"atom": "d", "status": "есть", "quote": "Требуется ли фиксировать историю изменения лимитов (кто, когда и на какое значение поменял)"},
+        {"atom": "e", "status": "нет", "quote": ""}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K5-S1", "status": "есть", "quote": "Разместить API в transfer-service … а изменения транслировать в limit-service через Kafka … Разместить API и хранилище непосредственно в limit-service."},
+    {"id": "K5-S2", "status": "нет", "quote": ""},
+    {"id": "K5-S3", "status": "нет", "quote": ""},
+    {"id": "K5-S4", "status": "нет", "quote": ""},
+    {"id": "K5-S5", "status": "нет", "quote": ""},
+    {"id": "K5-S6", "status": "нет", "quote": ""},
+    {"id": "K5-S7", "status": "нет", "quote": ""},
+    {"id": "K5-S8", "status": "нет", "quote": ""},
+    {"id": "K5-S9", "status": "нет", "quote": ""},
+    {"id": "K5-S10", "status": "нет", "quote": ""}
+  ],
+  "errors": [
+    {
+      "quote": "Убрать чтение лимитов через @Value в классе LimitLedger … При вызове метода принятия решения LimitLedger.decide()",
+      "category": "нарушение_формата",
+      "etalon_ref": "Раздел 10 (Специфичные штрафы: Предписание классов, методов)",
+      "code_ref": "prompt.md",
+      "explanation": "Промпт запрещает предписывать конкретные классы, методы и аннотации для изменения, это должен решать разработчик."
+    },
+    {
+      "quote": "если перевод зависнет в статусе NEW и будет переотправлен, он проверится по новым лимитам, даже если был создан до их изменения",
+      "category": "искажение",
+      "etalon_ref": "Раздел 10 (Специфичные штрафы: Повторный NEW пересчитывается по новым лимитам), L2, B14",
+      "code_ref": "limit-service LimitLedger.decide",
+      "explanation": "При повторном NEW с тем же id возвращается сохраненное решение, пересчета по текущим лимитам не происходит."
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "В разделе 6 модель верно описывает отсутствие transactional outbox (отправка в Kafka после коммита БД в LimitService.sendAndWait), что совпадает с аномалией A2."
+}

@@ -1,0 +1,178 @@
+{
+ "case": "01",
+ "answer_id": "C",
+ "mandatory": [
+  {
+   "id": "K1-M1",
+   "atoms": [
+    {
+     "atom": "a",
+     "status": "есть",
+     "quote": "Система принимает заявки на денежные переводы (отправитель, получатель, сумма, валюта) и автоматически решает, можно ли их провести."
+    },
+    {
+     "atom": "b",
+     "status": "есть",
+     "quote": "проверяет, укладывается ли перевод в дневной и месячный лимиты отправителя"
+    },
+    {
+     "atom": "c",
+     "status": "есть",
+     "quote": "и не заблокирован ли отправитель"
+    },
+    {
+     "atom": "d",
+     "status": "есть",
+     "quote": "По итогам обеих проверок перевод получает финальный статус COMPLETED, CANCELLED или DENIED"
+    }
+   ]
+  },
+  {
+   "id": "K1-M2",
+   "atoms": [
+    {
+     "atom": "a",
+     "status": "есть",
+     "quote": "Между собой сервисы взаимодействуют только через Kafka … Вызовов между сервисами (HTTP, gRPC и т. п.) в коде не найдено."
+    },
+    {
+     "atom": "b",
+     "status": "есть",
+     "quote": "limit-service и screening-service параллельно проверяют его и пишут результаты в `limit-results` и `screening-results`"
+    },
+    {
+     "atom": "c",
+     "status": "есть",
+     "quote": "transfer-service объединяет их через Kafka Streams (join в окне 10 с) и публикует итоговый статус в `transfers`"
+    }
+   ]
+  },
+  {
+   "id": "K1-M3",
+   "atoms": [
+    {
+     "atom": "a",
+     "status": "есть",
+     "quote": "| transfer-common | библиотека | нет | … | transfer-service | сервис | … | limit-service | сервис | … | screening-service | сервис |"
+    },
+    {
+     "atom": "b",
+     "status": "есть",
+     "quote": "| transfer-common | библиотека | нет |"
+    },
+    {
+     "atom": "c",
+     "status": "есть",
+     "quote": "| limit-service | сервис | нет (только Kafka) | … | screening-service | сервис | нет (только Kafka) | … Единственный синхронный интерфейс — внешний REST API transfer-service."
+    }
+   ]
+  },
+  {
+   "id": "K1-M4",
+   "atoms": [
+    {
+     "atom": "a",
+     "status": "есть",
+     "quote": "Java 21"
+    },
+    {
+     "atom": "b",
+     "status": "есть",
+     "quote": "Spring Boot 3.4.1"
+    },
+    {
+     "atom": "c",
+     "status": "есть",
+     "quote": "Spring for Apache Kafka, Kafka Streams (только transfer-service) … Apache Kafka (Confluent `cp-kafka` 7.6.0)"
+    },
+    {
+     "atom": "d",
+     "status": "есть",
+     "quote": "Liquibase (formatted SQL), драйвер PostgreSQL … PostgreSQL 16, OpenAPI 3.0.3."
+    }
+   ]
+  },
+  {
+   "id": "K1-M5",
+   "atoms": [
+    {
+     "atom": "a",
+     "status": "есть",
+     "quote": "| `transfers` | transfer-service: `TransferController.publishNew` (NEW) и `DecisionTopologyConfig.decisionStream` … limit-service (`limit`), screening-service (`screening` … (`transfer-tracker`)"
+    },
+    {
+     "atom": "b",
+     "status": "есть",
+     "quote": "| `limit-results` | limit-service … | transfer-service: Kafka Streams¹ и `transfer-tracker` | … | `screening-results` | screening-service … | transfer-service: Kafka Streams¹ и `transfer-tracker` |"
+    }
+   ]
+  },
+  {
+   "id": "K1-M6",
+   "atoms": [
+    {
+     "atom": "a",
+     "status": "есть",
+     "quote": "Apache Kafka: `confluentinc/cp-kafka:7.6.0`"
+    },
+    {
+     "atom": "b",
+     "status": "есть",
+     "quote": "PostgreSQL 16 (`postgres:16-alpine`): три независимые БД — `transferdb` (порт хоста 5434), `limitdb` (5432) и `screeningdb` (5433)."
+    }
+   ]
+  }
+ ],
+ "strong": [
+  {
+   "id": "K1-S1",
+   "status": "есть",
+   "quote": "| `transfers.DLT` | `KafkaErrorHandlingConfig` любого из трёх сервисов … | `limit-results.DLT`, `screening-results.DLT` | `KafkaErrorHandlingConfig` transfer-service |"
+  },
+  {
+   "id": "K1-S2",
+   "status": "есть",
+   "quote": "`application.id` Kafka Streams явно не задан. По умолчанию Spring Boot берёт `spring.application.name`, то есть `transfer-service`."
+  },
+  {
+   "id": "K1-S3",
+   "status": "есть",
+   "quote": "`cleanup.policy=compact` … Топики создают сами сервисы через бины `NewTopic` (объявления продублированы в `TopicsConfig` каждого сервиса), автосоздание в брокере отключено."
+  },
+  {
+   "id": "K1-S4",
+   "status": "есть",
+   "quote": "Общий контракт сообщений Kafka: record `com.example.common.Transfer`. … а у transfer-common родителя нет."
+  },
+  {
+   "id": "K1-S5",
+   "status": "есть",
+   "quote": "клиент сразу получает 201 со статусом NEW, а итог видит через `GET /transfers/{id}`"
+  },
+  {
+   "id": "K1-S6",
+   "status": "есть",
+   "quote": "один узел в режиме KRaft (broker + controller, без ZooKeeper). Внутри сети compose брокер доступен по `broker:29092`, с хоста — по `localhost:9092`. … одним `Dockerfile` (аргумент `MODULE`)"
+  }
+ ],
+ "errors": [],
+ "outside_etalon_correct": [
+  {
+   "quote": "Maven 3.9.9 (из образа сборки), Docker (multi-stage, runtime `eclipse-temurin:21-jre`)",
+   "code_ref": "Dockerfile: FROM maven:3.9.9-eclipse-temurin-21 AS poms / AS build; FROM eclipse-temurin:21-jre",
+   "explanation": "Версия Maven 3.9.9 и образ сборки в эталоне не названы (раздел 1 упоминает только многостадийный Dockerfile и JRE 21); по коду верно."
+  },
+  {
+   "quote": "профиль Spring `docker` переключает адреса Kafka и БД на имена контейнеров",
+   "code_ref": "application-docker.yml в transfer-service, limit-service, screening-service: spring.kafka.bootstrap-servers: broker:29092; spring.datasource.url на transfer-db / limit-db / screening-db",
+   "explanation": "Эталон говорит только, что сервисы запускаются с профилем docker; что именно меняет профиль — не описано. По коду верно."
+  },
+  {
+   "quote": "API для ведения списка заблокированных в коде не найдено. Список заполняется миграцией `002-insert-test-data.sql` с тестовыми данными, а порядок его ведения в эксплуатации требует уточнения.",
+   "code_ref": "screening-service: pom.xml (spring-boot-starter без web), BlockedSenderRepository.findBySenderId; db/changelog/002-insert-test-data.sql",
+   "explanation": "Эталон (S5) фиксирует тестовый стоп-лист из миграции, но не выделяет отсутствие механизма ведения стоп-листа как пробел для эксплуатации. По коду верно: записи в blocked_senders появляются только из миграции."
+  }
+ ],
+ "contamination": [],
+ "notes": "Ошибок, противоречащих коду, не найдено. Сомнительные места, не записанные в errors: (1) в таблице каналов про `transfers.DLT` сказано «сообщения, не обработанные после 3 повторов». Для ошибок обработки это верно (DefaultErrorHandler + FixedBackOff(1000, 3)), а не десериализуемые сообщения уходят в DLT сразу, без повторов (раздел 5.2 эталона). Модель не утверждает, что битые сообщения повторяются (типовая неточность из раздела 8 сформулирована именно так), поэтому это неполнота, а не искажение. (2) «ошибки возвращаются в формате Problem Details (`ApiExceptionHandler`)» — обобщение: 400/409/500/503 действительно problem+json, но 404 у GET /transfers/{id} возвращается без тела, а 409 формирует сам контроллер. Для кейса 1 это деталь вне рамок. (3) K1-S4 засчитан по ядру (record + нет родителя): «без зависимостей» явно не сказано, но в пункте нет слова «полностью». (4) K1-S6: healthcheck не упомянут, остальные детали (порты, KRaft, Dockerfile с MODULE, отсутствие тома у state-dir Streams) есть; слова «полностью» в пункте нет. Расхождений эталона с кодом по разделам 1, 5, 8 не обнаружено. Нарушений явных правил промпта (номера строк, диаграммы, детальная бизнес-логика методов) нет."
+}

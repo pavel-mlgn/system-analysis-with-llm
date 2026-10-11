@@ -1,0 +1,182 @@
+{
+ "case": "01",
+ "answer_id": "E",
+ "mandatory": [
+  {
+   "id": "K1-M1",
+   "atoms": [
+    {
+     "atom": "a",
+     "status": "есть",
+     "quote": "Система принимает и проверяет денежные переводы между клиентами."
+    },
+    {
+     "atom": "b",
+     "status": "есть",
+     "quote": "Первая — лимиты отправителя: дневной 50 000 и месячный 200 000"
+    },
+    {
+     "atom": "c",
+     "status": "есть",
+     "quote": "Вторая — скрининг по списку заблокированных отправителей."
+    },
+    {
+     "atom": "d",
+     "status": "есть",
+     "quote": "По итогам обеих проверок перевод получает финальный статус `COMPLETED`, `CANCELLED` или `DENIED`."
+    }
+   ]
+  },
+  {
+   "id": "K1-M2",
+   "atoms": [
+    {
+     "atom": "a",
+     "status": "есть",
+     "quote": "Используются событийно-ориентированные микросервисы с хореографией через Kafka … Синхронные вызовы между сервисами … (HTTP, gRPC и т. п.) в коде не найдены."
+    },
+    {
+     "atom": "b",
+     "status": "есть",
+     "quote": "Каждый перевод параллельно проходит две проверки. … `limit-service` и `screening-service` независимо публикуют свои решения в `limit-results` и `screening-results`."
+    },
+    {
+     "atom": "c",
+     "status": "есть",
+     "quote": "Kafka Streams в `transfer-service` (`DecisionTopologyConfig`) соединяет оба результата по id перевода в окне 10 с. Финальный статус вычисляет `TransferDecisionService.decide`"
+    }
+   ]
+  },
+  {
+   "id": "K1-M3",
+   "atoms": [
+    {
+     "atom": "a",
+     "status": "есть",
+     "quote": "агрегатор сборки (`packaging pom`) | нет | Объединяет модули в один reactor … `transfer-common` | библиотека … `transfer-service` | сервис … `limit-service` | сервис … `screening-service` | сервис"
+    },
+    {
+     "atom": "b",
+     "status": "есть",
+     "quote": "`transfer-common` | библиотека | нет | Общий контракт сообщений Kafka — record `Transfer`."
+    },
+    {
+     "atom": "c",
+     "status": "есть",
+     "quote": "`transfer-service` | сервис | есть: REST `/transfers`, порт 8080 (`TransferController`) … `limit-service` | сервис | нет … `screening-service` | сервис | нет"
+    }
+   ]
+  },
+  {
+   "id": "K1-M4",
+   "atoms": [
+    {
+     "atom": "a",
+     "status": "есть",
+     "quote": "Java 21"
+    },
+    {
+     "atom": "b",
+     "status": "есть",
+     "quote": "Spring Boot 3.4.1 (`spring-boot-starter-parent`)"
+    },
+    {
+     "atom": "c",
+     "status": "есть",
+     "quote": "Spring for Apache Kafka, Kafka Streams"
+    },
+    {
+     "atom": "d",
+     "status": "есть",
+     "quote": "Liquibase, PostgreSQL JDBC"
+    }
+   ]
+  },
+  {
+   "id": "K1-M5",
+   "atoms": [
+    {
+     "atom": "a",
+     "status": "есть",
+     "quote": "`transfers` | `transfer-service`: событие `NEW` … финальные статусы (`DecisionTopologyConfig`) … `limit-service` (`limit`) … `screening-service` (`screening`) … `transfer-service` (`transfer-tracker`)"
+    },
+    {
+     "atom": "b",
+     "status": "есть",
+     "quote": "`limit-results` | `limit-service` (`LimitService.sendAndWait`) | `transfer-service`: Kafka Streams-join и `TransferEventListener` (`transfer-tracker`) … `screening-results` | `screening-service`"
+    }
+   ]
+  },
+  {
+   "id": "K1-M6",
+   "atoms": [
+    {
+     "atom": "a",
+     "status": "есть",
+     "quote": "образ `confluentinc/cp-kafka:7.6.0`"
+    },
+    {
+     "atom": "b",
+     "status": "есть",
+     "quote": "(`postgres:16-alpine`), три отдельных экземпляра со схемами через Liquibase … `transfer-db`: БД `transferdb` … `limit-db`: `limitdb` … `screening-db`: `screeningdb`"
+    }
+   ]
+  }
+ ],
+ "strong": [
+  {
+   "id": "K1-S1",
+   "status": "нет",
+   "quote": ""
+  },
+  {
+   "id": "K1-S2",
+   "status": "есть",
+   "quote": "`application.id` Kafka Streams явно не задан. По умолчанию Spring Boot берёт `spring.application.name`, то есть `transfer-service`."
+  },
+  {
+   "id": "K1-S3",
+   "status": "есть",
+   "quote": "Топики `transfers`, `limit-results` и `screening-results` (3 партиции, compact) объявлены одинаково в `TopicsConfig` всех трёх сервисов. Автосоздание топиков на брокере отключено."
+  },
+  {
+   "id": "K1-S4",
+   "status": "нет",
+   "quote": ""
+  },
+  {
+   "id": "K1-S5",
+   "status": "нет",
+   "quote": ""
+  },
+  {
+   "id": "K1-S6",
+   "status": "есть",
+   "quote": "один узел в режиме KRaft (broker + controller). Внутренний адрес `broker:29092`, с хоста — `localhost:9092`. … порт хоста 5434 … порт 5432 … порт 5433"
+  }
+ ],
+ "errors": [
+  {
+   "quote": "transfers.DLT, limit-results.DLT, screening-results.DLT | DeadLetterPublishingRecoverer в KafkaErrorHandlingConfig каждого сервиса",
+   "category": "мелкая_ошибка",
+   "etalon_ref": "раздел 8 (Частые искажения)",
+   "code_ref": "limit-service/config/KafkaErrorHandlingConfig.java, screening-service/config/KafkaErrorHandlingConfig.java",
+   "explanation": "Топики limit-results.DLT и screening-results.DLT объявляются только в transfer-service, у limit-service и screening-service их нет.",
+   "source": "gemini-верификатор, подтверждено автором"
+  }
+ ],
+ "outside_etalon_correct": [
+  {
+   "quote": "Плагин генерации кода по OpenAPI в `pom.xml` не найден, контроллер написан вручную.",
+   "code_ref": "transfer-service/pom.xml, limit-service/pom.xml, screening-service/pom.xml (в build только spring-boot-maven-plugin); transfer-service TransferController (@RestController, ручные @PostMapping/@GetMapping)",
+   "explanation": "Верно: openapi-generator или аналогичного плагина нет, transfer-api.yaml лежит в resources как документ и в сборке не участвует."
+  },
+  {
+   "quote": "Maven (сборка в образе `maven:3.9.9-eclipse-temurin-21`), Docker (runtime `eclipse-temurin:21-jre`)",
+   "code_ref": "Dockerfile (стадии poms/build FROM maven:3.9.9-eclipse-temurin-21, финальная FROM eclipse-temurin:21-jre)",
+   "explanation": "Верно: точные версии образов сборки и запуска; в эталоне упомянуты только многостадийный Dockerfile и JRE 21 без версий образов."
+  }
+ ],
+ "contamination": [],
+ "notes": "1) Строка DLT в таблице каналов объединяет `transfers.DLT`, `limit-results.DLT`, `screening-results.DLT` с отправителем «DeadLetterPublishingRecoverer в KafkaErrorHandlingConfig каждого сервиса». Распределения нет (K1-S1 не засчитан). Буквальное прочтение похоже на «*-results.DLT пишут все сервисы» (мелкая ошибка по разделу 8), но собирательное прочтение (каждый сервис пишет в DLT своих входных топиков) верно по коду: limit и screening читают только `transfers`, recoverer пишет в record.topic()+\".DLT\". Из-за неоднозначности в errors не внесено. 2) «после 3 неудачных повторов» верно для ошибок обработки (FixedBackOff(1000L, 3L)); для не десериализуемых сообщений DLT сразу без повторов, но ответ о битых сообщениях ничего не утверждает — как ошибка не записано. 3) «screening-service (`screening`): только `NEW`» и «transfer-tracker: только финальные статусы» — группы читают все сообщения `transfers`, но обрабатывают только указанные (screening финалы логирует, трекер NEW игнорирует); по смыслу верно, не штрафуется. 4) K1-M3(a): число 4 не названо, но четыре модуля перечислены явно и отделены от корневого агрегатора — засчитано. 5) K1-S4: сказано только «record `Transfer`», про отсутствие зависимостей и родителя Spring Boot у transfer-common — нет. K1-S5: ответа 201 со статусом NEW и асинхронного итога через GET нет, есть лишь «клиент может запросить статус». 6) K1-S6 засчитан по ядру (KRaft, внутренний/внешний адрес брокера, порты БД); healthcheck, `ARG MODULE`, тома не названы. 7) Расхождений эталона с кодом по проверенным утверждениям не обнаружено. | Решение автора: добавлена мелкая ошибка «все DLT пишет каждый сервис» (нашёл Gemini-верификатор; *-results.DLT объявлены только в transfer-service)."
+}

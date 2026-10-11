@@ -1,0 +1,2383 @@
+===== FILE: Dockerfile =====
+FROM maven:3.9.9-eclipse-temurin-21 AS poms
+WORKDIR /src
+COPY . .
+RUN mkdir /poms && find . -name pom.xml -not -path '*/target/*' -exec cp --parents {} /poms \;
+
+FROM maven:3.9.9-eclipse-temurin-21 AS build
+ARG MODULE
+WORKDIR /build
+COPY --from=poms /poms/ ./
+RUN mvn -B -q -pl ${MODULE} -am dependency:go-offline
+COPY transfer-common/src transfer-common/src
+COPY ${MODULE}/src ${MODULE}/src
+RUN mvn -B -q -pl ${MODULE} -am -DskipTests package
+
+FROM eclipse-temurin:21-jre
+ARG MODULE
+RUN useradd --system --uid 1001 --home-dir /app --no-create-home app
+WORKDIR /app
+COPY --from=build /build/${MODULE}/target/${MODULE}-*.jar app.jar
+USER app
+ENTRYPOINT ["java", "-jar", "app.jar"]
+===== FILE: docker-compose.yml =====
+services:
+  broker:
+    image: confluentinc/cp-kafka:7.6.0
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://broker:29092,CONTROLLER://broker:29093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@broker:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "broker:29092"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
+  transfer-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: transferdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - transfer-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "localhost", "-U", "postgres", "-d", "transferdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  limit-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: limitdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - limit-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "localhost", "-U", "postgres", "-d", "limitdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  screening-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: screeningdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - screening-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "localhost", "-U", "postgres", "-d", "screeningdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  transfer-service:
+    image: transfer-limit-system/transfer-service:1.0-SNAPSHOT
+    build:
+      context: .
+      args:
+        MODULE: transfer-service
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      broker:
+        condition: service_healthy
+      transfer-db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+
+  limit-service:
+    image: transfer-limit-system/limit-service:1.0-SNAPSHOT
+    build:
+      context: .
+      args:
+        MODULE: limit-service
+    restart: unless-stopped
+    depends_on:
+      broker:
+        condition: service_healthy
+      limit-db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+
+  screening-service:
+    image: transfer-limit-system/screening-service:1.0-SNAPSHOT
+    build:
+      context: .
+      args:
+        MODULE: screening-service
+    restart: unless-stopped
+    depends_on:
+      broker:
+        condition: service_healthy
+      screening-db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+
+volumes:
+  kafka-data:
+  transfer-data:
+  limit-data:
+  screening-data:
+===== FILE: limit-service/pom.xml =====
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.1</version>
+        <relativePath/>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>limit-service</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <java.version>21</java.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.liquibase</groupId>
+            <artifactId>liquibase-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>transfer-common</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
+===== FILE: limit-service/src/main/java/com/example/limit/LimitApp.java =====
+package com.example.limit;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.kafka.annotation.EnableKafka;
+
+@SpringBootApplication
+@EnableKafka
+public class LimitApp {
+
+    public static void main(String[] args) {
+        SpringApplication.run(LimitApp.class, args);
+    }
+}
+===== FILE: limit-service/src/main/java/com/example/limit/config/KafkaErrorHandlingConfig.java =====
+package com.example.limit.config;
+
+import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.common.serialization.LongSerializer;
+import org.apache.kafka.common.serialization.Serializer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.config.TopicBuilder;
+import org.springframework.kafka.core.DefaultKafkaProducerFactory;
+import org.springframework.kafka.core.KafkaOperations;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
+import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.support.serializer.DelegatingByTypeSerializer;
+import org.springframework.kafka.support.serializer.JsonSerializer;
+import org.springframework.util.backoff.FixedBackOff;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+@Configuration
+public class KafkaErrorHandlingConfig {
+
+    @Bean
+    public NewTopic transfersDlt() {
+        return TopicBuilder.name("transfers.DLT").partitions(3).build();
+    }
+
+    @Bean
+    public DefaultErrorHandler kafkaErrorHandler(ProducerFactory<?, ?> producerFactory) {
+        Map<String, Object> producerConfig = producerFactory.getConfigurationProperties();
+        KafkaTemplate<Object, byte[]> rawTemplate = new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(
+                producerConfig, keySerializer(), new ByteArraySerializer()));
+        KafkaTemplate<Object, Object> jsonTemplate = new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(
+                producerConfig, keySerializer(), new JsonSerializer<>()));
+
+        Map<Class<?>, KafkaOperations<?, ?>> templates = new LinkedHashMap<>();
+        templates.put(byte[].class, rawTemplate);
+        templates.put(Object.class, jsonTemplate);
+
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(templates,
+                (record, ex) -> new TopicPartition(record.topic() + ".DLT", record.partition()));
+        recoverer.setFailIfSendResultIsError(false);
+        return new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 3L));
+    }
+
+    private static Serializer<Object> keySerializer() {
+        return new DelegatingByTypeSerializer(Map.of(
+                byte[].class, new ByteArraySerializer(),
+                Long.class, new LongSerializer()));
+    }
+}
+===== FILE: limit-service/src/main/java/com/example/limit/config/TopicsConfig.java =====
+package com.example.limit.config;
+
+import org.apache.kafka.clients.admin.NewTopic;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.config.TopicBuilder;
+
+@Configuration
+public class TopicsConfig {
+
+    @Bean
+    public NewTopic transfersTopic() {
+        return TopicBuilder.name("transfers").partitions(3).compact().build();
+    }
+
+    @Bean
+    public NewTopic limitResultsTopic() {
+        return TopicBuilder.name("limit-results").partitions(3).compact().build();
+    }
+
+    @Bean
+    public NewTopic screeningResultsTopic() {
+        return TopicBuilder.name("screening-results").partitions(3).compact().build();
+    }
+}
+===== FILE: limit-service/src/main/java/com/example/limit/domain/Reservation.java =====
+package com.example.limit.domain;
+
+import jakarta.persistence.*;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "reservations")
+public class Reservation {
+
+    public static final String APPROVED = "APPROVED";
+    public static final String DECLINED = "DECLINED";
+
+    public static final String STATE_RESERVED = "RESERVED";
+    public static final String STATE_COMMITTED = "COMMITTED";
+    public static final String STATE_RELEASED = "RELEASED";
+    public static final String STATE_NONE = "NONE";
+
+    @Id
+    private Long transferId;
+    private Long senderId;
+    private BigDecimal amount;
+    private String decision;
+    private String reason;
+    private String state;
+    private LocalDate reservedOn;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+
+    public Reservation() {
+    }
+
+    public Reservation(Long transferId, Long senderId, BigDecimal amount, LocalDate reservedOn) {
+        this.transferId = transferId;
+        this.senderId = senderId;
+        this.amount = amount;
+        this.reservedOn = reservedOn;
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = this.createdAt;
+    }
+
+    public void approve() {
+        this.decision = APPROVED;
+        this.reason = null;
+        this.state = STATE_RESERVED;
+    }
+
+    public void decline(String reason) {
+        this.decision = DECLINED;
+        this.reason = reason;
+        this.state = STATE_NONE;
+    }
+
+    public void markCommitted() {
+        this.state = STATE_COMMITTED;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void markReleased() {
+        this.state = STATE_RELEASED;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public boolean isReserved() {
+        return STATE_RESERVED.equals(state);
+    }
+
+    public Long getTransferId() { return transferId; }
+    public void setTransferId(Long transferId) { this.transferId = transferId; }
+    public Long getSenderId() { return senderId; }
+    public void setSenderId(Long senderId) { this.senderId = senderId; }
+    public BigDecimal getAmount() { return amount; }
+    public void setAmount(BigDecimal amount) { this.amount = amount; }
+    public String getDecision() { return decision; }
+    public void setDecision(String decision) { this.decision = decision; }
+    public String getReason() { return reason; }
+    public void setReason(String reason) { this.reason = reason; }
+    public String getState() { return state; }
+    public void setState(String state) { this.state = state; }
+    public LocalDate getReservedOn() { return reservedOn; }
+    public void setReservedOn(LocalDate reservedOn) { this.reservedOn = reservedOn; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    @Override
+    public String toString() {
+        return "Reservation{" +
+                "transferId=" + transferId +
+                ", senderId=" + senderId +
+                ", amount=" + amount +
+                ", decision='" + decision + '\'' +
+                ", reason='" + reason + '\'' +
+                ", state='" + state + '\'' +
+                ", reservedOn=" + reservedOn +
+                '}';
+    }
+}
+===== FILE: limit-service/src/main/java/com/example/limit/domain/SenderUsage.java =====
+package com.example.limit.domain;
+
+import jakarta.persistence.*;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.YearMonth;
+
+@Entity
+@Table(name = "sender_usage")
+public class SenderUsage {
+
+    @Id
+    private Long senderId;
+    private BigDecimal dailyUsed;
+    private BigDecimal monthlyUsed;
+    private LocalDate lastDailyReset;
+    private LocalDate lastMonthlyReset;
+
+    @Version
+    private Long version;
+
+    public SenderUsage() {
+    }
+
+    public SenderUsage(Long senderId, LocalDate today) {
+        this.senderId = senderId;
+        this.dailyUsed = BigDecimal.ZERO;
+        this.monthlyUsed = BigDecimal.ZERO;
+        this.lastDailyReset = today;
+        this.lastMonthlyReset = today;
+    }
+
+    public void lazyReset(LocalDate today) {
+        if (!today.equals(lastDailyReset)) {
+            dailyUsed = BigDecimal.ZERO;
+            lastDailyReset = today;
+        }
+        if (!YearMonth.from(today).equals(YearMonth.from(lastMonthlyReset))) {
+            monthlyUsed = BigDecimal.ZERO;
+            lastMonthlyReset = today;
+        }
+    }
+
+    public void reserve(BigDecimal amount) {
+        dailyUsed = dailyUsed.add(amount);
+        monthlyUsed = monthlyUsed.add(amount);
+    }
+
+    public void release(BigDecimal amount, LocalDate reservedOn, LocalDate today) {
+        lazyReset(today);
+        if (reservedOn.equals(today)) {
+            dailyUsed = dailyUsed.subtract(amount).max(BigDecimal.ZERO);
+        }
+        if (YearMonth.from(reservedOn).equals(YearMonth.from(today))) {
+            monthlyUsed = monthlyUsed.subtract(amount).max(BigDecimal.ZERO);
+        }
+    }
+
+    public Long getSenderId() { return senderId; }
+    public void setSenderId(Long senderId) { this.senderId = senderId; }
+    public BigDecimal getDailyUsed() { return dailyUsed; }
+    public void setDailyUsed(BigDecimal dailyUsed) { this.dailyUsed = dailyUsed; }
+    public BigDecimal getMonthlyUsed() { return monthlyUsed; }
+    public void setMonthlyUsed(BigDecimal monthlyUsed) { this.monthlyUsed = monthlyUsed; }
+    public LocalDate getLastDailyReset() { return lastDailyReset; }
+    public void setLastDailyReset(LocalDate lastDailyReset) { this.lastDailyReset = lastDailyReset; }
+    public LocalDate getLastMonthlyReset() { return lastMonthlyReset; }
+    public void setLastMonthlyReset(LocalDate lastMonthlyReset) { this.lastMonthlyReset = lastMonthlyReset; }
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
+
+    @Override
+    public String toString() {
+        return "SenderUsage{" +
+                "senderId=" + senderId +
+                ", dailyUsed=" + dailyUsed +
+                ", monthlyUsed=" + monthlyUsed +
+                ", lastDailyReset=" + lastDailyReset +
+                ", lastMonthlyReset=" + lastMonthlyReset +
+                ", version=" + version +
+                '}';
+    }
+}
+===== FILE: limit-service/src/main/java/com/example/limit/listener/TransferEventsListener.java =====
+package com.example.limit.listener;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.stereotype.Component;
+import com.example.common.Transfer;
+import com.example.limit.service.LimitService;
+
+@Component
+public class TransferEventsListener {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TransferEventsListener.class);
+
+    private final LimitService limitService;
+
+    public TransferEventsListener(LimitService limitService) {
+        this.limitService = limitService;
+    }
+
+    @KafkaListener(id = "limit-transfers-listener", topics = "transfers", groupId = "limit")
+    public void onEvent(Transfer transfer) {
+        LOG.info("Received {} for transfer {}", transfer.status(), transfer.id());
+        if (Transfer.NEW.equals(transfer.status())) {
+            limitService.onNewTransfer(transfer);
+        } else {
+            limitService.onFinalStatus(transfer);
+        }
+    }
+}
+===== FILE: limit-service/src/main/java/com/example/limit/repository/ReservationRepository.java =====
+package com.example.limit.repository;
+
+import org.springframework.data.repository.CrudRepository;
+import com.example.limit.domain.Reservation;
+
+public interface ReservationRepository extends CrudRepository<Reservation, Long> {
+}
+===== FILE: limit-service/src/main/java/com/example/limit/repository/SenderUsageRepository.java =====
+package com.example.limit.repository;
+
+import org.springframework.data.repository.CrudRepository;
+import com.example.limit.domain.SenderUsage;
+
+public interface SenderUsageRepository extends CrudRepository<SenderUsage, Long> {
+}
+===== FILE: limit-service/src/main/java/com/example/limit/service/LimitLedger.java =====
+package com.example.limit.service;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import com.example.common.Transfer;
+import com.example.limit.domain.Reservation;
+import com.example.limit.domain.SenderUsage;
+import com.example.limit.repository.ReservationRepository;
+import com.example.limit.repository.SenderUsageRepository;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.Optional;
+
+@Service
+public class LimitLedger {
+
+    private static final Logger LOG = LoggerFactory.getLogger(LimitLedger.class);
+
+    private final SenderUsageRepository usageRepository;
+    private final ReservationRepository reservationRepository;
+
+    @Value("${limits.daily-max}")
+    private BigDecimal dailyMax;
+
+    @Value("${limits.monthly-max}")
+    private BigDecimal monthlyMax;
+
+    public LimitLedger(SenderUsageRepository usageRepository, ReservationRepository reservationRepository) {
+        this.usageRepository = usageRepository;
+        this.reservationRepository = reservationRepository;
+    }
+
+    @Transactional
+    public Reservation decide(Transfer transfer) {
+        Optional<Reservation> existing = reservationRepository.findById(transfer.id());
+        if (existing.isPresent()) {
+            LOG.info("Duplicate NEW for transfer {}, returning stored decision", transfer.id());
+            return existing.get();
+        }
+
+        LocalDate today = LocalDate.now();
+        BigDecimal amount = transfer.amount();
+
+        if (amount == null || amount.signum() <= 0) {
+            Reservation invalid = new Reservation(transfer.id(), transfer.senderId(), BigDecimal.ZERO, today);
+            invalid.decline("INVALID_AMOUNT");
+            return reservationRepository.save(invalid);
+        }
+
+        Reservation reservation = new Reservation(transfer.id(), transfer.senderId(), amount, today);
+        SenderUsage usage = usageRepository.findById(transfer.senderId())
+                .orElseGet(() -> new SenderUsage(transfer.senderId(), today));
+        usage.lazyReset(today);
+        LOG.info("Sender {} usage before decision: daily={}, monthly={}",
+                usage.getSenderId(), usage.getDailyUsed(), usage.getMonthlyUsed());
+
+        if (usage.getDailyUsed().add(amount).compareTo(dailyMax) > 0) {
+            reservation.decline("DAILY_LIMIT_EXCEEDED");
+        } else if (usage.getMonthlyUsed().add(amount).compareTo(monthlyMax) > 0) {
+            reservation.decline("MONTHLY_LIMIT_EXCEEDED");
+        } else {
+            usage.reserve(amount);
+            reservation.approve();
+        }
+
+        usageRepository.save(usage);
+        return reservationRepository.save(reservation);
+    }
+
+    @Transactional
+    public void settle(Transfer transfer) {
+        Optional<Reservation> found = reservationRepository.findById(transfer.id());
+        if (found.isEmpty()) {
+            LOG.warn("No reservation for transfer {}, final status {} skipped", transfer.id(), transfer.status());
+            return;
+        }
+        Reservation reservation = found.get();
+        if (!reservation.isReserved()) {
+            LOG.info("Transfer {} is in state {}, nothing to settle", transfer.id(), reservation.getState());
+            return;
+        }
+
+        switch (transfer.status()) {
+            case "COMPLETED" -> reservation.markCommitted();
+            case "CANCELLED", "DENIED" -> {
+                SenderUsage usage = usageRepository.findById(reservation.getSenderId()).orElseThrow();
+                usage.release(reservation.getAmount(), reservation.getReservedOn(), LocalDate.now());
+                usageRepository.save(usage);
+                reservation.markReleased();
+            }
+            default -> {
+                LOG.warn("Unexpected final status {} for transfer {}", transfer.status(), transfer.id());
+                return;
+            }
+        }
+        reservationRepository.save(reservation);
+        LOG.info("Reservation for transfer {} settled: {}", reservation.getTransferId(), reservation.getState());
+    }
+}
+===== FILE: limit-service/src/main/java/com/example/limit/service/LimitService.java =====
+package com.example.limit.service;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.stereotype.Service;
+import com.example.common.Transfer;
+import com.example.limit.domain.Reservation;
+
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+@Service
+public class LimitService {
+
+    private static final String DECIDED_BY = "limit";
+    private static final Logger LOG = LoggerFactory.getLogger(LimitService.class);
+    private final LimitLedger ledger;
+    private final KafkaTemplate<Long, Transfer> template;
+
+    public LimitService(LimitLedger ledger, KafkaTemplate<Long, Transfer> template) {
+        this.ledger = ledger;
+        this.template = template;
+    }
+
+    public void onNewTransfer(Transfer transfer) {
+        Reservation reservation = ledger.decide(transfer);
+        sendAndWait(transfer.withDecision(reservation.getDecision(), DECIDED_BY, reservation.getReason()));
+    }
+
+    public void onFinalStatus(Transfer transfer) {
+        ledger.settle(transfer);
+    }
+
+    private void sendAndWait(Transfer transfer) {
+        try {
+            template.send("limit-results", transfer.id(), transfer).get(10, TimeUnit.SECONDS);
+            LOG.info("Published {} for transfer {}", transfer.status(), transfer.id());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while sending to limit-results", e);
+        } catch (ExecutionException | TimeoutException e) {
+            throw new IllegalStateException("Failed to send to limit-results", e);
+        }
+    }
+}
+===== FILE: limit-service/src/main/resources/application-docker.yml =====
+spring.kafka:
+  bootstrap-servers: broker:29092
+
+spring.datasource:
+  url: jdbc:postgresql://limit-db:5432/limitdb
+===== FILE: limit-service/src/main/resources/application.yml =====
+spring.application.name: limit-service
+spring.kafka:
+  admin:
+    modify-topic-configs: true
+  consumer:
+    auto-offset-reset: earliest
+    key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+    value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+    properties:
+      spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.LongDeserializer
+      spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+      spring.json.trusted.packages: "*"
+  producer:
+    key-serializer: org.apache.kafka.common.serialization.LongSerializer
+    value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    properties:
+      max.block.ms: 5000
+      request.timeout.ms: 5000
+      delivery.timeout.ms: 10000
+
+spring.datasource:
+  url: jdbc:postgresql://localhost:5432/limitdb
+  username: postgres
+  password: postgres
+  driver-class-name: org.postgresql.Driver
+
+spring.jpa:
+  hibernate:
+    ddl-auto: none
+  show-sql: true
+
+spring.liquibase:
+  change-log: classpath:db/changelog/changelog-master.yaml
+
+limits:
+  daily-max: 50000.00
+  monthly-max: 200000.00
+===== FILE: limit-service/src/main/resources/db/changelog/001-create-tables.sql =====
+--liquibase formatted sql
+
+--changeset developer:001-create-tables
+
+CREATE TABLE sender_usage (
+    sender_id           BIGINT PRIMARY KEY,
+    daily_used          DECIMAL(15,2) NOT NULL DEFAULT 0,
+    monthly_used        DECIMAL(15,2) NOT NULL DEFAULT 0,
+    last_daily_reset    DATE NOT NULL DEFAULT CURRENT_DATE,
+    last_monthly_reset  DATE NOT NULL DEFAULT CURRENT_DATE,
+    version             BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE reservations (
+    transfer_id  BIGINT PRIMARY KEY,
+    sender_id    BIGINT NOT NULL,
+    amount       DECIMAL(15,2) NOT NULL,
+    decision     VARCHAR(10) NOT NULL,
+    reason       VARCHAR(50),
+    state        VARCHAR(20) NOT NULL,
+    reserved_on  DATE NOT NULL,
+    created_at   TIMESTAMP NOT NULL,
+    updated_at   TIMESTAMP NOT NULL
+);
+
+CREATE INDEX idx_reservations_sender_id ON reservations(sender_id);
+===== FILE: limit-service/src/main/resources/db/changelog/changelog-master.yaml =====
+databaseChangeLog:
+  - include:
+      file: db/changelog/001-create-tables.sql
+===== FILE: pom.xml =====
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>transfer-limit-system</artifactId>
+    <packaging>pom</packaging>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <java.version>21</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <modules>
+        <module>transfer-service</module>
+        <module>limit-service</module>
+        <module>transfer-common</module>
+        <module>screening-service</module>
+    </modules>
+
+</project>
+===== FILE: screening-service/pom.xml =====
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.1</version>
+        <relativePath/>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>screening-service</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <java.version>21</java.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.liquibase</groupId>
+            <artifactId>liquibase-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>transfer-common</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
+===== FILE: screening-service/src/main/java/com/example/screening/ScreeningApp.java =====
+package com.example.screening;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.kafka.annotation.EnableKafka;
+
+@SpringBootApplication
+@EnableKafka
+public class ScreeningApp {
+
+    public static void main(String[] args) {
+        SpringApplication.run(ScreeningApp.class, args);
+    }
+}
+===== FILE: screening-service/src/main/java/com/example/screening/config/KafkaErrorHandlingConfig.java =====
+package com.example.screening.config;
+
+import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.common.serialization.LongSerializer;
+import org.apache.kafka.common.serialization.Serializer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.config.TopicBuilder;
+import org.springframework.kafka.core.DefaultKafkaProducerFactory;
+import org.springframework.kafka.core.KafkaOperations;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
+import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.support.serializer.DelegatingByTypeSerializer;
+import org.springframework.kafka.support.serializer.JsonSerializer;
+import org.springframework.util.backoff.FixedBackOff;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+@Configuration
+public class KafkaErrorHandlingConfig {
+
+    @Bean
+    public NewTopic transfersDlt() {
+        return TopicBuilder.name("transfers.DLT").partitions(3).build();
+    }
+
+    @Bean
+    public DefaultErrorHandler kafkaErrorHandler(ProducerFactory<?, ?> producerFactory) {
+        Map<String, Object> producerConfig = producerFactory.getConfigurationProperties();
+        KafkaTemplate<Object, byte[]> rawTemplate = new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(
+                producerConfig, keySerializer(), new ByteArraySerializer()));
+        KafkaTemplate<Object, Object> jsonTemplate = new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(
+                producerConfig, keySerializer(), new JsonSerializer<>()));
+
+        Map<Class<?>, KafkaOperations<?, ?>> templates = new LinkedHashMap<>();
+        templates.put(byte[].class, rawTemplate);
+        templates.put(Object.class, jsonTemplate);
+
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(templates,
+                (record, ex) -> new TopicPartition(record.topic() + ".DLT", record.partition()));
+        recoverer.setFailIfSendResultIsError(false);
+        return new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 3L));
+    }
+
+    private static Serializer<Object> keySerializer() {
+        return new DelegatingByTypeSerializer(Map.of(
+                byte[].class, new ByteArraySerializer(),
+                Long.class, new LongSerializer()));
+    }
+}
+===== FILE: screening-service/src/main/java/com/example/screening/config/TopicsConfig.java =====
+package com.example.screening.config;
+
+import org.apache.kafka.clients.admin.NewTopic;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.config.TopicBuilder;
+
+@Configuration
+public class TopicsConfig {
+
+    @Bean
+    public NewTopic transfersTopic() {
+        return TopicBuilder.name("transfers").partitions(3).compact().build();
+    }
+
+    @Bean
+    public NewTopic limitResultsTopic() {
+        return TopicBuilder.name("limit-results").partitions(3).compact().build();
+    }
+
+    @Bean
+    public NewTopic screeningResultsTopic() {
+        return TopicBuilder.name("screening-results").partitions(3).compact().build();
+    }
+}
+===== FILE: screening-service/src/main/java/com/example/screening/domain/BlockedSender.java =====
+package com.example.screening.domain;
+
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "blocked_senders")
+public class BlockedSender {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private Long senderId;
+    private String reason;
+    private LocalDateTime blockedAt;
+
+    public BlockedSender() {
+    }
+
+    public BlockedSender(Long senderId, String reason) {
+        this.senderId = senderId;
+        this.reason = reason;
+        this.blockedAt = LocalDateTime.now();
+    }
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public Long getSenderId() { return senderId; }
+    public void setSenderId(Long senderId) { this.senderId = senderId; }
+    public String getReason() { return reason; }
+    public void setReason(String reason) { this.reason = reason; }
+    public LocalDateTime getBlockedAt() { return blockedAt; }
+    public void setBlockedAt(LocalDateTime blockedAt) { this.blockedAt = blockedAt; }
+
+    @Override
+    public String toString() {
+        return "BlockedSender{" +
+                "id=" + id +
+                ", senderId=" + senderId +
+                ", reason='" + reason + '\'' +
+                ", blockedAt=" + blockedAt +
+                '}';
+    }
+}
+===== FILE: screening-service/src/main/java/com/example/screening/domain/ScreeningCheck.java =====
+package com.example.screening.domain;
+
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "screening_checks")
+public class ScreeningCheck {
+
+    public static final String APPROVED = "APPROVED";
+    public static final String DECLINED = "DECLINED";
+
+    @Id
+    private Long transferId;
+    private Long senderId;
+    private String result;
+    private String reason;
+    private LocalDateTime checkedAt;
+
+    public ScreeningCheck() {
+    }
+
+    public ScreeningCheck(Long transferId, Long senderId, String result, String reason) {
+        this.transferId = transferId;
+        this.senderId = senderId;
+        this.result = result;
+        this.reason = reason;
+        this.checkedAt = LocalDateTime.now();
+    }
+
+    public Long getTransferId() { return transferId; }
+    public void setTransferId(Long transferId) { this.transferId = transferId; }
+    public Long getSenderId() { return senderId; }
+    public void setSenderId(Long senderId) { this.senderId = senderId; }
+    public String getResult() { return result; }
+    public void setResult(String result) { this.result = result; }
+    public String getReason() { return reason; }
+    public void setReason(String reason) { this.reason = reason; }
+    public LocalDateTime getCheckedAt() { return checkedAt; }
+    public void setCheckedAt(LocalDateTime checkedAt) { this.checkedAt = checkedAt; }
+
+    @Override
+    public String toString() {
+        return "ScreeningCheck{" +
+                "transferId=" + transferId +
+                ", senderId=" + senderId +
+                ", result='" + result + '\'' +
+                ", reason='" + reason + '\'' +
+                ", checkedAt=" + checkedAt +
+                '}';
+    }
+}
+===== FILE: screening-service/src/main/java/com/example/screening/listener/TransferEventsListener.java =====
+package com.example.screening.listener;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.stereotype.Component;
+import com.example.common.Transfer;
+import com.example.screening.service.ScreeningService;
+
+@Component
+public class TransferEventsListener {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TransferEventsListener.class);
+
+    private final ScreeningService screeningService;
+
+    public TransferEventsListener(ScreeningService screeningService) {
+        this.screeningService = screeningService;
+    }
+
+    @KafkaListener(id = "screening-transfers-listener", topics = "transfers", groupId = "screening")
+    public void onEvent(Transfer transfer) {
+        LOG.info("Received {} for transfer {}", transfer.status(), transfer.id());
+        if (Transfer.NEW.equals(transfer.status())) {
+            screeningService.onNewTransfer(transfer);
+        } else {
+            LOG.info("Final status {} for transfer {}: screening holds no reservations, nothing to do",
+                    transfer.status(), transfer.id());
+        }
+    }
+}
+===== FILE: screening-service/src/main/java/com/example/screening/repository/BlockedSenderRepository.java =====
+package com.example.screening.repository;
+
+import org.springframework.data.repository.CrudRepository;
+import com.example.screening.domain.BlockedSender;
+
+import java.util.Optional;
+
+public interface BlockedSenderRepository extends CrudRepository<BlockedSender, Long> {
+    Optional<BlockedSender> findBySenderId(Long senderId);
+}
+===== FILE: screening-service/src/main/java/com/example/screening/repository/ScreeningCheckRepository.java =====
+package com.example.screening.repository;
+
+import org.springframework.data.repository.CrudRepository;
+import com.example.screening.domain.ScreeningCheck;
+
+public interface ScreeningCheckRepository extends CrudRepository<ScreeningCheck, Long> {
+}
+===== FILE: screening-service/src/main/java/com/example/screening/service/ScreeningJournal.java =====
+package com.example.screening.service;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import com.example.common.Transfer;
+import com.example.screening.domain.ScreeningCheck;
+import com.example.screening.repository.BlockedSenderRepository;
+import com.example.screening.repository.ScreeningCheckRepository;
+
+import java.util.Optional;
+
+@Service
+public class ScreeningJournal {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ScreeningJournal.class);
+
+    private final BlockedSenderRepository blockedSenderRepository;
+    private final ScreeningCheckRepository checkRepository;
+
+    public ScreeningJournal(BlockedSenderRepository blockedSenderRepository,
+                            ScreeningCheckRepository checkRepository) {
+        this.blockedSenderRepository = blockedSenderRepository;
+        this.checkRepository = checkRepository;
+    }
+
+    @Transactional
+    public ScreeningCheck check(Transfer transfer) {
+        Optional<ScreeningCheck> existing = checkRepository.findById(transfer.id());
+        if (existing.isPresent()) {
+            LOG.info("Duplicate NEW for transfer {}, returning stored check", transfer.id());
+            return existing.get();
+        }
+
+        var blocked = blockedSenderRepository.findBySenderId(transfer.senderId());
+        ScreeningCheck check;
+        if (blocked.isPresent()) {
+            LOG.info("Sender {} is blocked: {}", transfer.senderId(), blocked.get());
+            check = new ScreeningCheck(transfer.id(), transfer.senderId(),
+                    ScreeningCheck.DECLINED, "SENDER_BLOCKED");
+        } else {
+            check = new ScreeningCheck(transfer.id(), transfer.senderId(),
+                    ScreeningCheck.APPROVED, null);
+        }
+        return checkRepository.save(check);
+    }
+}
+===== FILE: screening-service/src/main/java/com/example/screening/service/ScreeningService.java =====
+package com.example.screening.service;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.stereotype.Service;
+import com.example.common.Transfer;
+import com.example.screening.domain.ScreeningCheck;
+
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+@Service
+public class ScreeningService {
+
+    private static final String DECIDED_BY = "screening";
+    private static final Logger LOG = LoggerFactory.getLogger(ScreeningService.class);
+    private final ScreeningJournal journal;
+    private final KafkaTemplate<Long, Transfer> template;
+
+    public ScreeningService(ScreeningJournal journal, KafkaTemplate<Long, Transfer> template) {
+        this.journal = journal;
+        this.template = template;
+    }
+
+    public void onNewTransfer(Transfer transfer) {
+        ScreeningCheck check = journal.check(transfer);
+        sendAndWait(transfer.withDecision(check.getResult(), DECIDED_BY, check.getReason()));
+    }
+
+    private void sendAndWait(Transfer transfer) {
+        try {
+            template.send("screening-results", transfer.id(), transfer).get(10, TimeUnit.SECONDS);
+            LOG.info("Published {} for transfer {}", transfer.status(), transfer.id());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while sending to screening-results", e);
+        } catch (ExecutionException | TimeoutException e) {
+            throw new IllegalStateException("Failed to send to screening-results", e);
+        }
+    }
+}
+===== FILE: screening-service/src/main/resources/application-docker.yml =====
+spring.kafka:
+  bootstrap-servers: broker:29092
+
+spring.datasource:
+  url: jdbc:postgresql://screening-db:5432/screeningdb
+===== FILE: screening-service/src/main/resources/application.yml =====
+spring.application.name: screening-service
+spring.kafka:
+  admin:
+    modify-topic-configs: true
+  consumer:
+    auto-offset-reset: earliest
+    key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+    value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+    properties:
+      spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.LongDeserializer
+      spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+      spring.json.trusted.packages: "*"
+  producer:
+    key-serializer: org.apache.kafka.common.serialization.LongSerializer
+    value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    properties:
+      max.block.ms: 5000
+      request.timeout.ms: 5000
+      delivery.timeout.ms: 10000
+
+spring.datasource:
+  url: jdbc:postgresql://localhost:5433/screeningdb
+  username: postgres
+  password: postgres
+  driver-class-name: org.postgresql.Driver
+
+spring.jpa:
+  hibernate:
+    ddl-auto: none
+  show-sql: true
+
+spring.liquibase:
+  change-log: classpath:db/changelog/changelog-master.yaml
+===== FILE: screening-service/src/main/resources/db/changelog/001-create-tables.sql =====
+--liquibase formatted sql
+
+--changeset developer:001-create-tables
+
+CREATE TABLE blocked_senders (
+    id              BIGSERIAL PRIMARY KEY,
+    sender_id       BIGINT NOT NULL UNIQUE,
+    reason          VARCHAR(255) NOT NULL,
+    blocked_at      TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_blocked_senders_sender_id ON blocked_senders(sender_id);
+
+CREATE TABLE screening_checks (
+    transfer_id  BIGINT PRIMARY KEY,
+    sender_id    BIGINT NOT NULL,
+    result       VARCHAR(10) NOT NULL,
+    reason       VARCHAR(50),
+    checked_at   TIMESTAMP NOT NULL
+);
+
+CREATE INDEX idx_screening_checks_sender_id ON screening_checks(sender_id);
+===== FILE: screening-service/src/main/resources/db/changelog/002-insert-test-data.sql =====
+--liquibase formatted sql
+
+--changeset developer:002-insert-test-data
+
+INSERT INTO blocked_senders (sender_id, reason, blocked_at) VALUES
+(5,  'Fraud detected', NOW()),
+(13, 'Sanctions list', NOW()),
+(21, 'Suspicious activity', NOW()),
+(34, 'Identity theft report', NOW()),
+(42, 'Court order', NOW());
+===== FILE: screening-service/src/main/resources/db/changelog/changelog-master.yaml =====
+databaseChangeLog:
+  - include:
+      file: db/changelog/001-create-tables.sql
+  - include:
+      file: db/changelog/002-insert-test-data.sql
+===== FILE: transfer-common/pom.xml =====
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>transfer-common</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <java.version>21</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+    </properties>
+
+</project>
+===== FILE: transfer-common/src/main/java/com/example/common/Transfer.java =====
+package com.example.common;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+public record Transfer(Long id,
+                       Long senderId,
+                       Long recipientId,
+                       BigDecimal amount,
+                       String currency,
+                       String status,
+                       String decidedBy,
+                       String messageInfo,
+                       LocalDateTime createdAt) {
+
+    public static final String NEW = "NEW";
+
+    public static Transfer newTransfer(Long id, Long senderId, Long recipientId, BigDecimal amount,
+                                       String currency, LocalDateTime createdAt) {
+        return new Transfer(id, senderId, recipientId, amount, currency, NEW, null, null, createdAt);
+    }
+
+    public Transfer withDecision(String status, String decidedBy, String messageInfo) {
+        return new Transfer(id, senderId, recipientId, amount, currency, status, decidedBy, messageInfo, createdAt);
+    }
+}
+===== FILE: transfer-service/pom.xml =====
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.1</version>
+        <relativePath/>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>transfer-service</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <java.version>21</java.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-streams</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.liquibase</groupId>
+            <artifactId>liquibase-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>transfer-common</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
+===== FILE: transfer-service/src/main/java/com/example/transfer/TransferApp.java =====
+package com.example.transfer;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.kafka.annotation.EnableKafka;
+
+@SpringBootApplication
+@EnableKafka
+public class TransferApp {
+
+    public static void main(String[] args) {
+        SpringApplication.run(TransferApp.class, args);
+    }
+}
+===== FILE: transfer-service/src/main/java/com/example/transfer/config/DecisionTopologyConfig.java =====
+package com.example.transfer.config;
+
+import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.streams.StreamsBuilder;
+import org.apache.kafka.streams.kstream.Consumed;
+import org.apache.kafka.streams.kstream.JoinWindows;
+import org.apache.kafka.streams.kstream.KStream;
+import org.apache.kafka.streams.kstream.StreamJoined;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.annotation.EnableKafkaStreams;
+import org.springframework.kafka.support.serializer.JsonSerde;
+import com.example.common.Transfer;
+import com.example.transfer.service.TransferDecisionService;
+
+import java.time.Duration;
+
+@Configuration
+@EnableKafkaStreams
+public class DecisionTopologyConfig {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DecisionTopologyConfig.class);
+
+    @Bean
+    public KStream<Long, Transfer> decisionStream(StreamsBuilder builder, TransferDecisionService decisionService) {
+        JsonSerde<Transfer> transferSerde = new JsonSerde<>(Transfer.class);
+        KStream<Long, Transfer> limitResults = builder
+                .stream("limit-results", Consumed.with(Serdes.Long(), transferSerde));
+
+        limitResults.join(
+                        builder.stream("screening-results", Consumed.with(Serdes.Long(), transferSerde)),
+                        decisionService::decide,
+                        JoinWindows.ofTimeDifferenceWithNoGrace(Duration.ofSeconds(10)),
+                        StreamJoined.with(Serdes.Long(), transferSerde, transferSerde))
+                .peek((key, decision) -> LOG.info("Decision for transfer {}: {}", decision.id(), decision.status()))
+                .to("transfers");
+
+        return limitResults;
+    }
+}
+===== FILE: transfer-service/src/main/java/com/example/transfer/config/KafkaErrorHandlingConfig.java =====
+package com.example.transfer.config;
+
+import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.common.serialization.LongSerializer;
+import org.apache.kafka.common.serialization.Serializer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.config.TopicBuilder;
+import org.springframework.kafka.core.DefaultKafkaProducerFactory;
+import org.springframework.kafka.core.KafkaOperations;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
+import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.support.serializer.DelegatingByTypeSerializer;
+import org.springframework.kafka.support.serializer.JsonSerializer;
+import org.springframework.util.backoff.FixedBackOff;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+@Configuration
+public class KafkaErrorHandlingConfig {
+
+    @Bean
+    public NewTopic transfersDlt() {
+        return TopicBuilder.name("transfers.DLT").partitions(3).build();
+    }
+
+    @Bean
+    public NewTopic limitResultsDlt() {
+        return TopicBuilder.name("limit-results.DLT").partitions(3).build();
+    }
+
+    @Bean
+    public NewTopic screeningResultsDlt() {
+        return TopicBuilder.name("screening-results.DLT").partitions(3).build();
+    }
+
+    @Bean
+    public DefaultErrorHandler kafkaErrorHandler(ProducerFactory<?, ?> producerFactory) {
+        Map<String, Object> producerConfig = producerFactory.getConfigurationProperties();
+        KafkaTemplate<Object, byte[]> rawTemplate = new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(
+                producerConfig, keySerializer(), new ByteArraySerializer()));
+        KafkaTemplate<Object, Object> jsonTemplate = new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(
+                producerConfig, keySerializer(), new JsonSerializer<>()));
+
+        Map<Class<?>, KafkaOperations<?, ?>> templates = new LinkedHashMap<>();
+        templates.put(byte[].class, rawTemplate);
+        templates.put(Object.class, jsonTemplate);
+
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(templates,
+                (record, ex) -> new TopicPartition(record.topic() + ".DLT", record.partition()));
+        recoverer.setFailIfSendResultIsError(false);
+        return new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 3L));
+    }
+
+    private static Serializer<Object> keySerializer() {
+        return new DelegatingByTypeSerializer(Map.of(
+                byte[].class, new ByteArraySerializer(),
+                Long.class, new LongSerializer()));
+    }
+}
+===== FILE: transfer-service/src/main/java/com/example/transfer/config/TopicsConfig.java =====
+package com.example.transfer.config;
+
+import org.apache.kafka.clients.admin.NewTopic;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.config.TopicBuilder;
+
+@Configuration
+public class TopicsConfig {
+
+    @Bean
+    public NewTopic transfersTopic() {
+        return TopicBuilder.name("transfers").partitions(3).compact().build();
+    }
+
+    @Bean
+    public NewTopic limitResultsTopic() {
+        return TopicBuilder.name("limit-results").partitions(3).compact().build();
+    }
+
+    @Bean
+    public NewTopic screeningResultsTopic() {
+        return TopicBuilder.name("screening-results").partitions(3).compact().build();
+    }
+}
+===== FILE: transfer-service/src/main/java/com/example/transfer/controller/ApiExceptionHandler.java =====
+package com.example.transfer.controller;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+
+@RestControllerAdvice
+public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ApiExceptionHandler.class);
+    private static final String INTERNAL_ERROR = "Внутренняя ошибка сервера, повторите запрос позже";
+
+    @ExceptionHandler(Exception.class)
+    public ProblemDetail handleUnexpected(Exception e) {
+        LOG.error("Unhandled exception", e);
+        return ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, INTERNAL_ERROR);
+    }
+}
+===== FILE: transfer-service/src/main/java/com/example/transfer/controller/TransferController.java =====
+package com.example.transfer.controller;
+
+import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.kafka.KafkaException;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+import com.example.common.Transfer;
+import com.example.transfer.domain.TransferEntity;
+import com.example.transfer.domain.TransferHistoryEntry;
+import com.example.transfer.repository.TransferHistoryRepository;
+import com.example.transfer.repository.TransferRepository;
+import com.example.transfer.service.TransferTrackingService;
+
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+@RestController
+@RequestMapping("/transfers")
+public class TransferController {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TransferController.class);
+    private static final String STATUS_NEW = "NEW";
+    private static final String KAFKA_UNAVAILABLE =
+            "Kafka недоступна, перевод сохранён — повторите запрос с тем же id";
+
+    private final KafkaTemplate<Long, Transfer> template;
+    private final TransferRepository transferRepository;
+    private final TransferHistoryRepository historyRepository;
+    private final TransferTrackingService trackingService;
+
+    public TransferController(KafkaTemplate<Long, Transfer> template,
+                              TransferRepository transferRepository,
+                              TransferHistoryRepository historyRepository,
+                              TransferTrackingService trackingService) {
+        this.template = template;
+        this.transferRepository = transferRepository;
+        this.historyRepository = historyRepository;
+        this.trackingService = trackingService;
+    }
+
+    @PostMapping
+    public ResponseEntity<?> create(@Valid @RequestBody TransferRequest request) {
+        var existing = transferRepository.findById(request.id());
+        if (existing.isPresent()) {
+            return duplicate(existing.get(), request);
+        }
+
+        TransferEntity entity;
+        try {
+            entity = trackingService.createTransfer(request);
+        } catch (DataIntegrityViolationException e) {
+            return transferRepository.findById(request.id())
+                    .map(found -> duplicate(found, request))
+                    .orElseThrow(() -> e);
+        }
+
+        publishNew(entity);
+        return ResponseEntity.status(HttpStatus.CREATED).body(entity);
+    }
+
+    @GetMapping
+    public List<TransferEntity> all() {
+        return transferRepository.findAllByOrderByCreatedAtDesc();
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> getById(@PathVariable Long id) {
+        var transfer = transferRepository.findById(id);
+        if (transfer.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        List<TransferHistoryEntry> history = historyRepository.findByTransferIdOrderByChangedAtAsc(id).stream()
+                .sorted(Comparator.comparing(TransferHistoryEntry::getStage)
+                        .thenComparing(TransferHistoryEntry::getChangedAt))
+                .toList();
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("transfer", transfer.get());
+        response.put("history", history);
+        return ResponseEntity.ok(response);
+    }
+
+    private ResponseEntity<?> duplicate(TransferEntity existing, TransferRequest request) {
+        if (!sameParameters(existing, request)) {
+            LOG.warn("Transfer id={} already exists with other parameters", request.id());
+            ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+                    "Перевод с id=" + request.id() + " уже существует с другими параметрами");
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
+        }
+        if (STATUS_NEW.equals(existing.getStatus())) {
+            publishNew(existing);
+        }
+        LOG.info("Duplicate transfer id={}, returning existing", request.id());
+        return ResponseEntity.ok(existing);
+    }
+
+    private boolean sameParameters(TransferEntity existing, TransferRequest request) {
+        return existing.getSenderId().equals(request.senderId())
+                && existing.getRecipientId().equals(request.recipientId())
+                && existing.getAmount().compareTo(request.amount()) == 0
+                && existing.getCurrency().equals(request.currencyOrDefault());
+    }
+
+    private void publishNew(TransferEntity entity) {
+        Transfer message = Transfer.newTransfer(entity.getId(), entity.getSenderId(), entity.getRecipientId(),
+                entity.getAmount(), entity.getCurrency(), entity.getCreatedAt());
+        try {
+            template.send("transfers", message.id(), message).get(10, TimeUnit.SECONDS);
+            LOG.info("Published {} for transfer {}", message.status(), message.id());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, KAFKA_UNAVAILABLE, e);
+        } catch (ExecutionException | TimeoutException | KafkaException | org.apache.kafka.common.KafkaException e) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, KAFKA_UNAVAILABLE, e);
+        }
+    }
+}
+===== FILE: transfer-service/src/main/java/com/example/transfer/controller/TransferRequest.java =====
+package com.example.transfer.controller;
+
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
+
+import java.math.BigDecimal;
+
+public record TransferRequest(
+        @NotNull Long id,
+        @NotNull Long senderId,
+        @NotNull Long recipientId,
+        @NotNull @Positive @Digits(integer = 13, fraction = 2) BigDecimal amount,
+        @Pattern(regexp = "[A-Z]{3}") String currency) {
+
+    public static final String DEFAULT_CURRENCY = "RUB";
+
+    public String currencyOrDefault() {
+        return currency == null ? DEFAULT_CURRENCY : currency;
+    }
+}
+===== FILE: transfer-service/src/main/java/com/example/transfer/domain/HistoryStage.java =====
+package com.example.transfer.domain;
+
+public enum HistoryStage {
+    NEW,
+    LIMIT,
+    SCREENING,
+    FINAL
+}
+===== FILE: transfer-service/src/main/java/com/example/transfer/domain/TransferEntity.java =====
+package com.example.transfer.domain;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
+import org.springframework.data.domain.Persistable;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "transfers")
+public class TransferEntity implements Persistable<Long> {
+
+    @Transient
+    private boolean newEntity = true;
+
+    @Id
+    private Long id;
+    private Long senderId;
+    private Long recipientId;
+    private BigDecimal amount;
+    private String currency;
+    private String status;
+    private String decidedBy;
+    private String messageInfo;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+
+    public TransferEntity() {
+    }
+
+    @Override
+    @JsonIgnore
+    public boolean isNew() {
+        return newEntity;
+    }
+
+    @PostLoad
+    @PostPersist
+    void markNotNew() {
+        this.newEntity = false;
+    }
+
+    @Override
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public Long getSenderId() { return senderId; }
+    public void setSenderId(Long senderId) { this.senderId = senderId; }
+    public Long getRecipientId() { return recipientId; }
+    public void setRecipientId(Long recipientId) { this.recipientId = recipientId; }
+    public BigDecimal getAmount() { return amount; }
+    public void setAmount(BigDecimal amount) { this.amount = amount; }
+    public String getCurrency() { return currency; }
+    public void setCurrency(String currency) { this.currency = currency; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public String getDecidedBy() { return decidedBy; }
+    public void setDecidedBy(String decidedBy) { this.decidedBy = decidedBy; }
+    public String getMessageInfo() { return messageInfo; }
+    public void setMessageInfo(String messageInfo) { this.messageInfo = messageInfo; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    @Override
+    public String toString() {
+        return "TransferEntity{" +
+                "id=" + id +
+                ", senderId=" + senderId +
+                ", recipientId=" + recipientId +
+                ", amount=" + amount +
+                ", currency='" + currency + '\'' +
+                ", status='" + status + '\'' +
+                ", decidedBy='" + decidedBy + '\'' +
+                ", messageInfo='" + messageInfo + '\'' +
+                ", createdAt=" + createdAt +
+                ", updatedAt=" + updatedAt +
+                '}';
+    }
+}
+===== FILE: transfer-service/src/main/java/com/example/transfer/domain/TransferHistoryEntry.java =====
+package com.example.transfer.domain;
+
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "transfer_history")
+public class TransferHistoryEntry {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private Long transferId;
+    @Enumerated(EnumType.STRING)
+    private HistoryStage stage;
+    private String status;
+    private String decidedBy;
+    private String messageInfo;
+    private LocalDateTime changedAt;
+
+    public TransferHistoryEntry() {
+    }
+
+    public TransferHistoryEntry(Long transferId, HistoryStage stage, String status, String decidedBy, String messageInfo) {
+        this.transferId = transferId;
+        this.stage = stage;
+        this.status = status;
+        this.decidedBy = decidedBy;
+        this.messageInfo = messageInfo;
+        this.changedAt = LocalDateTime.now();
+    }
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public Long getTransferId() { return transferId; }
+    public void setTransferId(Long transferId) { this.transferId = transferId; }
+    public HistoryStage getStage() { return stage; }
+    public void setStage(HistoryStage stage) { this.stage = stage; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public String getDecidedBy() { return decidedBy; }
+    public void setDecidedBy(String decidedBy) { this.decidedBy = decidedBy; }
+    public String getMessageInfo() { return messageInfo; }
+    public void setMessageInfo(String messageInfo) { this.messageInfo = messageInfo; }
+    public LocalDateTime getChangedAt() { return changedAt; }
+    public void setChangedAt(LocalDateTime changedAt) { this.changedAt = changedAt; }
+
+    @Override
+    public String toString() {
+        return "TransferHistoryEntry{" +
+                "id=" + id +
+                ", transferId=" + transferId +
+                ", stage=" + stage +
+                ", status='" + status + '\'' +
+                ", decidedBy='" + decidedBy + '\'' +
+                ", messageInfo='" + messageInfo + '\'' +
+                ", changedAt=" + changedAt +
+                '}';
+    }
+}
+===== FILE: transfer-service/src/main/java/com/example/transfer/listener/TransferEventListener.java =====
+package com.example.transfer.listener;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
+import org.springframework.stereotype.Component;
+import com.example.common.Transfer;
+import com.example.transfer.domain.HistoryStage;
+import com.example.transfer.service.TransferTrackingService;
+
+@Component
+public class TransferEventListener {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TransferEventListener.class);
+    private final TransferTrackingService trackingService;
+
+    public TransferEventListener(TransferTrackingService trackingService) {
+        this.trackingService = trackingService;
+    }
+
+    @KafkaListener(id = "transfer-tracker",
+            topics = {"transfers", "limit-results", "screening-results"},
+            groupId = "transfer-tracker")
+    public void onEvent(Transfer transfer, @Header(KafkaHeaders.RECEIVED_TOPIC) String topic) {
+        LOG.info("Received {} for transfer {} from {}", transfer.status(), transfer.id(), topic);
+        switch (topic) {
+            case "limit-results" -> trackingService.recordServiceResult(transfer, HistoryStage.LIMIT);
+            case "screening-results" -> trackingService.recordServiceResult(transfer, HistoryStage.SCREENING);
+            case "transfers" -> {
+                if (!Transfer.NEW.equals(transfer.status())) {
+                    trackingService.applyFinalStatus(transfer);
+                }
+            }
+            default -> LOG.warn("Unexpected topic {}", topic);
+        }
+    }
+}
+===== FILE: transfer-service/src/main/java/com/example/transfer/repository/TransferHistoryRepository.java =====
+package com.example.transfer.repository;
+
+import org.springframework.data.repository.CrudRepository;
+import com.example.transfer.domain.HistoryStage;
+import com.example.transfer.domain.TransferHistoryEntry;
+
+import java.util.List;
+
+public interface TransferHistoryRepository extends CrudRepository<TransferHistoryEntry, Long> {
+    List<TransferHistoryEntry> findByTransferIdOrderByChangedAtAsc(Long transferId);
+
+    boolean existsByTransferIdAndStage(Long transferId, HistoryStage stage);
+}
+===== FILE: transfer-service/src/main/java/com/example/transfer/repository/TransferRepository.java =====
+package com.example.transfer.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import com.example.transfer.domain.TransferEntity;
+
+import java.util.List;
+
+public interface TransferRepository extends JpaRepository<TransferEntity, Long> {
+    List<TransferEntity> findAllByOrderByCreatedAtDesc();
+}
+===== FILE: transfer-service/src/main/java/com/example/transfer/service/TransferDecisionService.java =====
+package com.example.transfer.service;
+
+import org.springframework.stereotype.Service;
+import com.example.common.Transfer;
+
+@Service
+public class TransferDecisionService {
+
+    private static final String APPROVED = "APPROVED";
+    private static final String DECLINED = "DECLINED";
+
+    public Transfer decide(Transfer limitResult, Transfer screeningResult) {
+        boolean limitApproved = APPROVED.equals(limitResult.status());
+        boolean limitDeclined = DECLINED.equals(limitResult.status());
+        boolean screeningApproved = APPROVED.equals(screeningResult.status());
+        boolean screeningDeclined = DECLINED.equals(screeningResult.status());
+
+        if (limitApproved && screeningApproved) {
+            return limitResult.withDecision("COMPLETED", null, null);
+        } else if (limitDeclined && screeningDeclined) {
+            return limitResult.withDecision("DENIED", null,
+                    limitResult.messageInfo() + "; " + screeningResult.messageInfo());
+        } else if (limitDeclined && screeningApproved) {
+            return limitResult.withDecision("CANCELLED", "limit", limitResult.messageInfo());
+        } else if (limitApproved && screeningDeclined) {
+            return limitResult.withDecision("CANCELLED", "screening", screeningResult.messageInfo());
+        } else {
+            return limitResult.withDecision("CANCELLED", null, "UNEXPECTED_RESULT: limit=" + limitResult.status()
+                    + ", screening=" + screeningResult.status());
+        }
+    }
+}
+===== FILE: transfer-service/src/main/java/com/example/transfer/service/TransferTrackingService.java =====
+package com.example.transfer.service;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import com.example.common.Transfer;
+import com.example.transfer.controller.TransferRequest;
+import com.example.transfer.domain.HistoryStage;
+import com.example.transfer.domain.TransferEntity;
+import com.example.transfer.domain.TransferHistoryEntry;
+import com.example.transfer.repository.TransferHistoryRepository;
+import com.example.transfer.repository.TransferRepository;
+
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+
+@Service
+public class TransferTrackingService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TransferTrackingService.class);
+    private final TransferRepository transferRepository;
+    private final TransferHistoryRepository historyRepository;
+
+    public TransferTrackingService(TransferRepository transferRepository,
+                                   TransferHistoryRepository historyRepository) {
+        this.transferRepository = transferRepository;
+        this.historyRepository = historyRepository;
+    }
+
+    @Transactional
+    public TransferEntity createTransfer(TransferRequest request) {
+        LocalDateTime now = now();
+        TransferEntity entity = new TransferEntity();
+        entity.setId(request.id());
+        entity.setSenderId(request.senderId());
+        entity.setRecipientId(request.recipientId());
+        entity.setAmount(request.amount());
+        entity.setCurrency(request.currencyOrDefault());
+        entity.setStatus("NEW");
+        entity.setCreatedAt(now);
+        entity.setUpdatedAt(now);
+        transferRepository.saveAndFlush(entity);
+
+        historyRepository.save(historyEntry(entity.getId(), HistoryStage.NEW, "NEW", null, null, now));
+
+        LOG.info("Created transfer {} with status {}", entity.getId(), entity.getStatus());
+        return entity;
+    }
+
+    @Transactional
+    public void recordServiceResult(Transfer result, HistoryStage stage) {
+        var entity = transferRepository.findById(result.id());
+        if (entity.isEmpty()) {
+            LOG.warn("Unknown transfer {} in {} result, skipped", result.id(), stage);
+            return;
+        }
+        if (historyRepository.existsByTransferIdAndStage(result.id(), stage)) {
+            LOG.info("Duplicate {} result for transfer {}, skipped", stage, result.id());
+            return;
+        }
+        LocalDateTime now = now();
+        historyRepository.save(historyEntry(
+                result.id(), stage, result.status(), result.decidedBy(), result.messageInfo(), now));
+        entity.get().setUpdatedAt(now);
+        transferRepository.save(entity.get());
+        LOG.info("Recorded {} result for transfer {}: {}", stage, result.id(), result.status());
+    }
+
+    @Transactional
+    public void applyFinalStatus(Transfer result) {
+        var found = transferRepository.findById(result.id());
+        if (found.isEmpty()) {
+            LOG.warn("Unknown transfer {} in final status, skipped", result.id());
+            return;
+        }
+        if (historyRepository.existsByTransferIdAndStage(result.id(), HistoryStage.FINAL)) {
+            LOG.info("Duplicate final status for transfer {}, skipped", result.id());
+            return;
+        }
+        TransferEntity entity = found.get();
+        entity.setStatus(result.status());
+        entity.setDecidedBy(result.decidedBy());
+        entity.setMessageInfo(result.messageInfo());
+        LocalDateTime now = now();
+        entity.setUpdatedAt(now);
+        transferRepository.save(entity);
+
+        historyRepository.save(historyEntry(
+                entity.getId(), HistoryStage.FINAL, result.status(), result.decidedBy(), result.messageInfo(), now));
+
+        LOG.info("Final status {} applied to transfer {}", entity.getStatus(), entity.getId());
+    }
+
+    private static LocalDateTime now() {
+        return LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
+    }
+
+    private static TransferHistoryEntry historyEntry(Long transferId, HistoryStage stage, String status,
+                                                     String decidedBy, String messageInfo, LocalDateTime changedAt) {
+        TransferHistoryEntry entry = new TransferHistoryEntry(transferId, stage, status, decidedBy, messageInfo);
+        entry.setChangedAt(changedAt);
+        return entry;
+    }
+}
+===== FILE: transfer-service/src/main/resources/application-docker.yml =====
+spring.kafka:
+  bootstrap-servers: broker:29092
+
+spring.datasource:
+  url: jdbc:postgresql://transfer-db:5432/transferdb
+===== FILE: transfer-service/src/main/resources/application.yml =====
+spring.application.name: transfer-service
+spring.kafka:
+  admin:
+    modify-topic-configs: true
+  consumer:
+    auto-offset-reset: earliest
+    key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+    value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+    properties:
+      spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.LongDeserializer
+      spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+      spring.json.trusted.packages: "*"
+  producer:
+    key-serializer: org.apache.kafka.common.serialization.LongSerializer
+    value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    properties:
+      max.block.ms: 5000
+      request.timeout.ms: 5000
+      delivery.timeout.ms: 10000
+  streams:
+    properties:
+      default.key.serde: org.apache.kafka.common.serialization.Serdes$LongSerde
+      default.value.serde: org.springframework.kafka.support.serializer.JsonSerde
+      spring.json.trusted.packages: "*"
+      default.deserialization.exception.handler: org.apache.kafka.streams.errors.LogAndContinueExceptionHandler
+    state-dir: /tmp/transfer-service-streams
+
+spring.datasource:
+  url: jdbc:postgresql://localhost:5434/transferdb
+  username: postgres
+  password: postgres
+  driver-class-name: org.postgresql.Driver
+
+spring.jpa:
+  open-in-view: false
+  hibernate:
+    ddl-auto: none
+  show-sql: true
+
+spring.liquibase:
+  change-log: classpath:db/changelog/changelog-master.yaml
+
+spring.mvc.problemdetails.enabled: true
+===== FILE: transfer-service/src/main/resources/db/changelog/001-create-tables.sql =====
+--liquibase formatted sql
+
+--changeset developer:001-create-tables
+
+CREATE TABLE transfers (
+    id              BIGINT PRIMARY KEY,
+    sender_id       BIGINT NOT NULL,
+    recipient_id    BIGINT NOT NULL,
+    amount          DECIMAL(15,2) NOT NULL,
+    currency        VARCHAR(10) NOT NULL DEFAULT 'RUB',
+    status          VARCHAR(20) NOT NULL,
+    decided_by      VARCHAR(20),
+    message_info    TEXT,
+    created_at      TIMESTAMP NOT NULL,
+    updated_at      TIMESTAMP
+);
+
+CREATE INDEX idx_transfers_sender_id ON transfers(sender_id);
+CREATE INDEX idx_transfers_status ON transfers(status);
+
+CREATE TABLE transfer_history (
+    id              BIGSERIAL PRIMARY KEY,
+    transfer_id     BIGINT NOT NULL REFERENCES transfers(id),
+    status          VARCHAR(20) NOT NULL,
+    decided_by      VARCHAR(20),
+    message_info    TEXT,
+    changed_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+    stage           VARCHAR(20) NOT NULL,
+    CONSTRAINT uq_transfer_history_stage UNIQUE (transfer_id, stage)
+);
+
+CREATE INDEX idx_transfer_history_transfer_id ON transfer_history(transfer_id);
+===== FILE: transfer-service/src/main/resources/db/changelog/changelog-master.yaml =====
+databaseChangeLog:
+  - include:
+      file: db/changelog/001-create-tables.sql
+===== FILE: transfer-service/src/main/resources/openapi/transfer-api.yaml =====
+openapi: 3.0.3
+info:
+  title: Transfer Service API
+  version: 1.0.0
+
+paths:
+  /transfers:
+    post:
+      summary: Создать перевод
+      operationId: createTransfer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transfer'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transfer'
+        '400':
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    get:
+      summary: Получить все переводы
+      operationId: getAllTransfers
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transfer'
+
+  /transfers/{id}:
+    get:
+      summary: Получить перевод по ID с историей
+      operationId: getTransferById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferWithHistory'
+        '404':
+          description: Not Found
+
+components:
+  schemas:
+    TransferRequest:
+      type: object
+      required:
+        - id
+        - senderId
+        - recipientId
+        - amount
+      properties:
+        id:
+          type: integer
+          format: int64
+        senderId:
+          type: integer
+          format: int64
+        recipientId:
+          type: integer
+          format: int64
+        amount:
+          type: number
+          format: decimal
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 9999999999999.99
+          multipleOf: 0.01
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          default: "RUB"
+
+    Transfer:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        senderId:
+          type: integer
+          format: int64
+        recipientId:
+          type: integer
+          format: int64
+        amount:
+          type: number
+          format: decimal
+        currency:
+          type: string
+        status:
+          $ref: '#/components/schemas/TransferStatus'
+        decidedBy:
+          type: string
+          nullable: true
+        messageInfo:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    TransferStatus:
+      type: string
+      enum:
+        - NEW
+        - COMPLETED
+        - CANCELLED
+        - DENIED
+
+    TransferWithHistory:
+      type: object
+      properties:
+        transfer:
+          $ref: '#/components/schemas/Transfer'
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/HistoryEntry'
+
+    HistoryEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        transferId:
+          type: integer
+          format: int64
+        stage:
+          type: string
+          enum:
+            - NEW
+            - LIMIT
+            - SCREENING
+            - FINAL
+        status:
+          type: string
+          enum:
+            - NEW
+            - APPROVED
+            - DECLINED
+            - COMPLETED
+            - CANCELLED
+            - DENIED
+        decidedBy:
+          type: string
+          nullable: true
+        messageInfo:
+          type: string
+          nullable: true
+        changedAt:
+          type: string
+
+    Problem:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string

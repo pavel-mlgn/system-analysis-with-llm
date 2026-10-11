@@ -1,0 +1,162 @@
+{
+  "case": "01",
+  "answer_id": "B",
+  "mandatory": [
+    {
+      "id": "K1-M1",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Система принимает и отслеживает денежные переводы"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "проверяя их по двум независимым направлениям: лимитам отправителя"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "и наличию отправителя в списке заблокированных"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "Результаты проверок объединяются, после чего переводу присваивается финальный статус"
+        }
+      ]
+    },
+    {
+      "id": "K1-M2",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Микросервисная событийно-ориентированная архитектура... и Kafka как транспортом ... синхронные вызовы между сервисами в коде не найдены"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "limit-service и screening-service независимо выполняют проверки и публикуют результаты"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "после чего Kafka Streams в transfer-service объединяет их и возвращает финальное событие"
+        }
+      ]
+    },
+    {
+      "id": "K1-M3",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Корневой pom.xml объединяет четыре Maven-модуля"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "transfer-common | библиотека | нет | Общая модель Kafka-сообщения com.example.common.Transfer."
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "HTTP API найден только в transfer-service: POST /transfers, GET /transfers, GET /transfers/{id}"
+        }
+      ]
+    },
+    {
+      "id": "K1-M4",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Java 21"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "Spring Boot 3.4.1"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Spring Kafka, Apache Kafka Streams"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "PostgreSQL JDBC, Liquibase"
+        }
+      ]
+    },
+    {
+      "id": "K1-M5",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "transfers | transfer-service ... limit-service — TransferEventsListener#onEvent, group limit; screening-service — ... group screening; transfer-service — ... group transfer-tracker"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "limit-results | limit-service ... Kafka Streams ... transfer-tracker ... screening-results | screening-service ... Kafka Streams ... transfer-tracker"
+        }
+      ]
+    },
+    {
+      "id": "K1-M6",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "confluentinc/cp-kafka:7.6.0"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "три отдельные PostgreSQL 16 (postgres:16-alpine): transferdb для transfer-service, limitdb для limit-service, screeningdb для screening-service"
+        }
+      ]
+    }
+  ],
+  "strong": [
+    {
+      "id": "K1-S1",
+      "status": "есть",
+      "quote": "transfers.DLT | настроен DeadLetterPublishingRecoverer в сервисах, потребляющих transfers ... limit-results.DLT | DLT-направление настроено в transfer-service"
+    },
+    {
+      "id": "K1-S2",
+      "status": "есть",
+      "quote": "Kafka Streams DecisionTopologyConfig#decisionStream — group/application id явно в коде не задан"
+    },
+    {
+      "id": "K1-S3",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S4",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S5",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S6",
+      "status": "есть",
+      "quote": "в одновузловой конфигурации broker/controller ... Для Kafka и каждой БД определены persistent Docker volumes"
+    }
+  ],
+  "errors": [],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Модель предоставила полный и точный ответ. Засчитан пункт K1-S2, так как эталон явно допускает формулировку «явно не задан» в качестве верного вывода."
+}

@@ -1,0 +1,183 @@
+{
+  "case": "03",
+  "answer_id": "D",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Эндпоинт: POST /transfers … Эндпоинт: GET /transfers … Эндпоинт: GET /transfers/{id}"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "| 201 | Перевода с таким id нет … | 200 | Перевод с таким id уже существует … | 400 | Нарушены ограничения … существует с другими параметрами … | 503 | Ошибка или таймаут"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "| 200 | Перевод найден | … | 404 | Перевод не найден, тело пустое |"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "| id | body | integer (int64) | да (`@NotNull`) | … | amount | body | number | да (`@NotNull`) | … | (корень) | array | нет | Список переводов"
+        }
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "transfers (база: transferdb) … transfer_history (база: transferdb) … sender_usage (база: limitdb) … reservations … blocked_senders (база: screeningdb) … screening_checks (база: screeningdb)"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "| amount | DECIMAL(15,2) | — | — | — | да | — | — | Сумма перевода |"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Таблица: reservations (база: limitdb) … | transfer_id | BIGINT | да | — | да (PK) | … Таблица: screening_checks (база: screeningdb) … | transfer_id | BIGINT | да | — | да (PK) |"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "| transfer_id | BIGINT | — | `transfers(id)`, ON DELETE / ON UPDATE не заданы |"
+        },
+        {
+          "atom": "e",
+          "status": "есть",
+          "quote": "| `uq_transfer_history_stage` (UNIQUE) | transfer_id, stage |"
+        },
+        {
+          "atom": "f",
+          "status": "есть",
+          "quote": "| sender_id | BIGINT | — | — | да | да | — | `idx_blocked_senders_sender_id`; неявный индекс UNIQUE |"
+        }
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "| id | Long | нет | … | recipientId | Long | нет | … | amount | BigDecimal | нет | … | currency | String | нет | … | decidedBy | String | да | … | createdAt | LocalDateTime | нет |"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "| NEW | null | null | … | COMPLETED, CANCELLED, DENIED | limit, screening, null | … | limit-results (`LimitService.java`) | APPROVED, DECLINED | limit |"
+        }
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "| Число партиций | 3 | … `cleanup.policy=compact` (`TopicBuilder.compact()`) … ### Канал: limit-results … ### Канал: screening-results … `cleanup.policy=compact`; срок хранения"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "| Ключ сообщения | `Transfer.id` (`Long`) — идентификатор перевода | … Отправка: JSON через `JsonSerializer` (`application.yml`)"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "transfer-service: `TransferController.java` → `publishNew()` (событие NEW) … группа `limit` … группа `screening` … группа `transfer-tracker` … limit-service: `LimitService.java` → `sendAndWait()`"
+        }
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "| Код 500 (все операции) | Не описан | `ApiExceptionHandler.java` → `handleUnexpected()` возвращает 500"
+        }
+      ]
+    }
+  ],
+  "strong": [
+    {
+      "id": "K3-S1",
+      "status": "есть",
+      "quote": "| version | BIGINT | — | — | — | да | `0` | — | Версия строки для оптимистической блокировки (`@Version`) |"
+    },
+    {
+      "id": "K3-S2",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K3-S3",
+      "status": "есть",
+      "quote": "`transfersDlt` в `KafkaErrorHandlingConfig.java` всех трёх сервисов … `limitResultsDlt` … только в transfer-service … `DeadLetterPublishingRecoverer` в transfer-service (группа `transfer-tracker`)"
+    },
+    {
+      "id": "K3-S4",
+      "status": "есть",
+      "quote": "| status | String | нет | Статус (значения по каналам — в таблице ниже) | … Значения полей status / decidedBy / messageInfo по каналам"
+    },
+    {
+      "id": "K3-S5",
+      "status": "есть",
+      "quote": "| state | RESERVED, COMMITTED, RELEASED, NONE |"
+    },
+    {
+      "id": "K3-S6",
+      "status": "есть",
+      "quote": "группа = `application.id`, явно не задан, Spring Boot подставляет `spring.application.name` = `transfer-service`"
+    },
+    {
+      "id": "K3-S7",
+      "status": "есть",
+      "quote": "| GET /transfers/{id}: код 400 | Не описан (только 200 и 404) | … | `TransferRequest.currency`: значение `null` | `nullable` не указан … на `10.100` ответ 400"
+    },
+    {
+      "id": "K3-S8",
+      "status": "есть",
+      "quote": "тип передаётся заголовком `__TypeId__` = `com.example.common.Transfer`"
+    },
+    {
+      "id": "K3-S9",
+      "status": "есть",
+      "quote": "пишет его массивом чисел: год, месяц, день, час, минута, секунда, наносекунды | `[2026,10,2,12,30,15,123456000]`"
+    }
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {
+      "quote": "в Kafka Streams — `JsonSerde` (`default.value.serde`)",
+      "code_ref": "transfer-service DecisionTopologyConfig.decisionStream; transfer-service application.yml (spring.kafka.streams.properties.default.value.serde)",
+      "explanation": "Итог JOIN пишется через .to(\"transfers\") без Produced: значение join-результата не имеет явного serde, поэтому используется default.value.serde = JsonSerde из application.yml, а ключ — Serdes.Long() из StreamJoined. Эталон (5.3) упоминает только JsonSerde<>(Transfer.class) для входов JOIN."
+    },
+    {
+      "quote": "| Сериализация ключа | `DelegatingByTypeSerializer`: `Long` → `LongSerializer`, `byte[]` → `ByteArraySerializer` |",
+      "code_ref": "KafkaErrorHandlingConfig.keySerializer / kafkaErrorHandler (все три сервиса)",
+      "explanation": "DLT-шаблоны используют DelegatingByTypeSerializer для ключа (byte[] и Long) и отдельные шаблоны для значения: byte[] → ByteArraySerializer, Object → JsonSerializer. Эталон описывает только итог (исходные байты против JSON), но не сериализаторы."
+    },
+    {
+      "quote": "| type | string | нет | URI типа ошибки. В коде не задаётся, Spring подставляет `about:blank` |",
+      "code_ref": "transfer-service ApiExceptionHandler.handleUnexpected; TransferController.duplicate; application.yml (spring.mvc.problemdetails.enabled: true)",
+      "explanation": "ProblemDetail.forStatusAndDetail не задаёт type, по умолчанию about:blank; instance Spring MVC заполняет путём запроса при записи ProblemDetail. Структура тела ошибки в эталоне не расписана."
+    },
+    {
+      "quote": "| decided_by | NULL (этап NEW); limit (LIMIT); screening (SCREENING); limit, screening, NULL (FINAL) |",
+      "code_ref": "TransferTrackingService.createTransfer / recordServiceResult / applyFinalStatus; LimitService.DECIDED_BY; ScreeningService.DECIDED_BY",
+      "explanation": "Распределение значений decided_by по этапам истории верно: NEW пишется с null, LIMIT и SCREENING — из ответов с decidedBy limit/screening, FINAL — из решения JOIN."
+    }
+  ],
+  "contamination": [],
+  "notes": "Ошибок, противоречащих коду, не найдено. K3-S2 не засчитан: в колонке FK у таблиц limitdb и screeningdb стоят прочерки, но явного утверждения, что связи reservations/sender_usage и screening_checks/blocked_senders логические, нет. K3-S4 засчитан отдельной находкой: строка «status | String … значения по каналам» и отдельная таблица значений по каналам (тип String + разбиение по каналам), а M3(b) закрыт перечнем самих значений. K3-M5 закрыт расхождением O1 (500), K3-S7 — O2, O6, O8 (также есть O3 и O7). Фраза «Ошибки обработки у получателей: 3 повтора с интервалом 1 с, затем запись в transfers.DLT» не считается неточностью из раздела 8: речь об ошибках обработки, а для ошибок десериализации ответ отдельно говорит об исходных байтах; про повторы битых сообщений не утверждается. Имена changelog-топиков JOIN даны шаблоном с пометкой «требует уточнения» — верно (эталон 5.1). Нарушений формата не найдено: JSON-типы в HTTP, SQL-типы в БД, Java-типы в сообщениях, прозы между таблицами нет. Расхождений эталона с кодом не обнаружено."
+}

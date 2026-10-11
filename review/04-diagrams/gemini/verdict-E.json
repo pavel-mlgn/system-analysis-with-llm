@@ -1,0 +1,78 @@
+{
+  "case": "04",
+  "answer_id": "E",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "subgraph TransferService ... subgraph LimitService ... subgraph ScreeningService"},
+        {"atom": "b", "status": "есть", "quote": "subgraph Databases ... transfer-db: transferdb ... limit-db: limitdb ... screening-db: screeningdb"},
+        {"atom": "c", "status": "есть", "quote": "subgraph Kafka ... TopicTransfers ... TopicLimitResults ... TopicScreeningResults"},
+        {"atom": "d", "status": "есть", "quote": "User -->|\"HTTP POST /transfers, GET /transfers/{id}\"| TransferController"},
+        {"atom": "e", "status": "есть", "quote": "Показаны контейнеры системы, Kafka-топики, PostgreSQL-базы и основные каналы взаимодействия между ними."}
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "TTS->>TR: \"saveAndFlush(TransferEntity status=NEW)\" … TC->>TTK: \"send(\\\"transfers\\\", id, Transfer NEW).get(10s)\" … TC-->>Client: \"201 Created TransferEntity status=NEW\""},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "есть", "quote": "DS: \"stream(\\\"limit-results\\\") join stream(\\\"screening-results\\\")\""},
+        {"atom": "d", "status": "есть", "quote": "TEL: \"onEvent(Transfer COMPLETED) from \\\"transfers\\\"\" … LL: \"onEvent(Transfer COMPLETED) groupId=\\\"limit\\\"\""}
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {"atom": "a", "status": "нет", "quote": ""},
+        {"atom": "b", "status": "есть", "quote": "Note over TR,THR: \"Уже выполнено: transfers и transfer_history сохранены со статусом NEW\""},
+        {"atom": "c", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfer-db: transferdb … limit-db: limitdb … screening-db: screeningdb"},
+        {"atom": "b", "status": "есть", "quote": "transfers ||--o{ transfer_history : \"transfer_id FK\""},
+        {"atom": "c", "status": "есть", "quote": "erDiagram … TransferRequest … Transfer"},
+        {"atom": "d", "status": "есть", "quote": "sender_usage ||..o{ reservations : \"sender_id логическая\" … blocked_senders ||..o{ screening_checks : \"sender_id логическая\""}
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "[*] --> NEW: \"POST /transfers, TransferTrackingService.createTransfer()\""},
+        {"atom": "b", "status": "есть", "quote": "NEW --> COMPLETED: \"TransferDecisionService.decide: limit=APPROVED и screening=APPROVED\" … NEW --> CANCELLED … NEW --> DENIED"},
+        {"atom": "c", "status": "есть", "quote": "COMPLETED --> [*] … CANCELLED --> [*] … DENIED --> [*]"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K4-S1", "status": "нет", "quote": ""},
+    {"id": "K4-S2", "status": "нет", "quote": ""},
+    {"id": "K4-S3", "status": "есть", "quote": "TEL: \"onEvent(Transfer COMPLETED) from \\\"transfers\\\"\" … SL: \"onEvent(Transfer COMPLETED) groupId=\\\"screening\\\"\" … SL->>SL: \"screening holds no reservations, nothing to do\""},
+    {"id": "K4-S4", "status": "есть", "quote": "LimitKafkaErrorHandlingConfig -.->|\"DLT publish on error\"| TopicTransfersDLT … TransferKafkaErrorHandlingConfig -.->|\"DLT publish on error\"| TopicLimitResultsDLT"},
+    {"id": "K4-S5", "status": "нет", "quote": ""},
+    {"id": "K4-S6", "status": "нет", "quote": ""},
+    {"id": "K4-S7", "status": "есть", "quote": "CANCELLED: limit=DECLINED и screening=APPROVED, или limit=APPROVED и screening=DECLINED, или UNEXPECTED_RESULT"}
+  ],
+  "errors": [
+    {
+      "quote": "NONE → RESERVED при approve()",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "раздел 8",
+      "code_ref": "limit-service domain/Reservation.java",
+      "explanation": "Состояние NONE является конечным (устанавливается при decline()), переход из NONE в RESERVED невозможен."
+    },
+    {
+      "quote": "sender_usage ||..o{ reservations : \"sender_id логическая\"",
+      "category": "неточность",
+      "etalon_ref": "9.4; раздел 4.2",
+      "code_ref": "limit-service LimitLedger.decide",
+      "explanation": "Указана обязательная связь 1 (||) со стороны sender_usage, хотя при INVALID_AMOUNT для нового пользователя sender_usage не создаётся, кардинальность должна быть 0..1 (|o)."
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Выбран сценарий технического отказа (Kafka недоступна). Согласно правилам кейса 4, атом (b) группы K4-M3 закрыт фактом сохранения перевода, атомы (a) и (c) не закрываются."
+}

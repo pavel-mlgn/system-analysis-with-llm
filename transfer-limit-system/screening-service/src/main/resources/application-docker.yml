@@ -1,0 +1,5 @@
+spring.kafka:
+  bootstrap-servers: broker:29092
+
+spring.datasource:
+  url: jdbc:postgresql://screening-db:5432/screeningdb

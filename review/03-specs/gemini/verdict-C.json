@@ -1,0 +1,98 @@
+{
+  "case": "03",
+  "answer_id": "C",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Эндпоинт: POST /transfers ... Эндпоинт: GET /transfers ... Эндпоинт: GET /transfers/{id}"},
+        {"atom": "b", "status": "есть", "quote": "201 | Успешное создание нового перевода. ... 200 ... 400 ... 409 ... 503 ... 500"},
+        {"atom": "c", "status": "есть", "quote": "200 | Перевод успешно найден. ... 404 | Перевод с указанным id не найден. ... 500"},
+        {"atom": "d", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Таблица: sender_usage (база: limitdb) ... Таблица: reservations (база: limitdb) ... Таблица: blocked_senders (база: screeningdb) ... Таблица: screening_checks ... Таблица: transfers ... transfer_history"},
+        {"atom": "b", "status": "есть", "quote": "daily_used | DECIMAL(15,2) ... amount | DECIMAL(15,2)"},
+        {"atom": "c", "status": "есть", "quote": "reservations ... transfer_id | BIGINT | Да ... screening_checks ... transfer_id | BIGINT | Да"},
+        {"atom": "d", "status": "есть", "quote": "transfer_id | BIGINT | Нет | transfers(id)"},
+        {"atom": "e", "status": "есть", "quote": "Ограничения уровня таблицы: ... uq_transfer_history_stage | transfer_id, stage"},
+        {"atom": "f", "status": "есть", "quote": "blocked_senders ... sender_id | BIGINT | Нет | Нет | Да"}
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "id | Long ... senderId | Long ... recipientId | Long ... amount | BigDecimal ... currency | String ... status | String ... decidedBy | String ... messageInfo | String ... createdAt"},
+        {"atom": "b", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfers ... Партиции | 3 ... Политика хранения | compact ... limit-results ... Партиции | 3 ... Политика хранения | compact ... screening-results ... Партиции | 3 ... Политика хранения | compact"},
+        {"atom": "b", "status": "есть", "quote": "Ключ сообщения | Long (ID перевода) ... Сериализация значения | JsonSerializer / JsonDeserializer"},
+        {"atom": "c", "status": "есть", "quote": "Отправители | transfer-service ... Получатели | limit-service (group: limit), screening-service (group: screening), transfer-service (group: transfer-tracker)"}
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "4. РАСХОЖДЕНИЯ КОНТРАКТА API С КОДОМ ... Глобальные коды ответов"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K3-S1", "status": "есть", "quote": "version | BIGINT | Нет | Нет | Нет | Да | 0 | Нет | Поле для оптимистичной блокировки"},
+    {"id": "K3-S2", "status": "нет", "quote": ""},
+    {"id": "K3-S3", "status": "есть", "quote": "Канал: transfers.DLT, limit-results.DLT, screening-results.DLT ... Отправители | Все сервисы (через DeadLetterPublishingRecoverer)"},
+    {"id": "K3-S4", "status": "нет", "quote": ""},
+    {"id": "K3-S5", "status": "есть", "quote": "state | RESERVED, COMMITTED, RELEASED, NONE"},
+    {"id": "K3-S6", "status": "нет", "quote": ""},
+    {"id": "K3-S7", "status": "нет", "quote": ""},
+    {"id": "K3-S8", "status": "нет", "quote": ""},
+    {"id": "K3-S9", "status": "нет", "quote": ""}
+  ],
+  "errors": [
+    {
+      "quote": "id | body | Long | Да | ID перевода",
+      "category": "нарушение_формата",
+      "etalon_ref": "Кейс 3, специфичные штрафы",
+      "code_ref": "HTTP API",
+      "explanation": "Java-типы вместо JSON-типов в HTTP API"
+    },
+    {
+      "quote": "Для поля amount не указан параметр формата minimum: 0",
+      "category": "ложная_аномалия",
+      "etalon_ref": "раздел 6.1, Выдуманные расхождения",
+      "code_ref": "openapi/transfer-api.yaml",
+      "explanation": "В контракте присутствует ограничение minimum: 0 для поля amount"
+    },
+    {
+      "quote": "Поле TransferEntity.status имеет тип String и не привязано к перечислению в Java",
+      "category": "ложная_аномалия",
+      "etalon_ref": "раздел 6.1, Выдуманные расхождения",
+      "code_ref": "transfer-api.yaml, TransferEntity",
+      "explanation": "Выдуманное расхождение: enum в контракте против String в коде не является расхождением, так как значения совпадают"
+    },
+    {
+      "quote": "Канал: transfers.DLT, limit-results.DLT, screening-results.DLT ... Отправители | Все сервисы",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "раздел 8, Частые искажения",
+      "code_ref": "transfer-service KafkaErrorHandlingConfig",
+      "explanation": "Топики *-results.DLT пишет только transfer-service, а не все сервисы"
+    },
+    {
+      "quote": "createdAt | String(ISO) / LocalDateTime",
+      "category": "неточность",
+      "etalon_ref": "раздел 4.4; раздел 8",
+      "code_ref": "Kafka ErrorHandlingConfig, Transfer record",
+      "explanation": "createdAt сериализуется в Kafka как массив элементов переменной длины, а не ISO-строка"
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Модель описывает DLT топики одной таблицей и утверждает, что отправители - все сервисы. Это частично закрывает сильный пункт K3-S3 (само упоминание наличия DLT топиков и их отправителей), но влечет штраф за мелкую ошибку, так как *-results.DLT пишет только transfer-service."
+}

@@ -1,0 +1,68 @@
+{
+  "case": "03",
+  "answer_id": "A",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Эндпоинт: POST /transfers … Эндпоинт: GET /transfers … Эндпоинт: GET /transfers/{id}"},
+        {"atom": "b", "status": "есть", "quote": "| 201 | Новый ресурс создан … | 200 | Ресурс с тем же `id` и совпадающими входными параметрами … | 400 | Нарушена валидация … | 409 | Ресурс с тем же `id` существует … | 503 |"},
+        {"atom": "c", "status": "есть", "quote": "| 200 | Ресурс с указанным `id` найден … | 404 | Ресурс с указанным `id` не найден"},
+        {"atom": "d", "status": "есть", "quote": "| id | body | integer | да … | amount | body | number | да … | currency | body | string | нет … | history | array<object> | нет"}
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "sender_usage (база: limitdb) … reservations (база: limitdb) … blocked_senders (база: screeningdb) … screening_checks (база: screeningdb) … transfers (база: transferdb) … transfer_history (база:"},
+        {"atom": "b", "status": "есть", "quote": "| daily_used | DECIMAL(15,2) … | amount | DECIMAL(15,2) | нет | нет | нет | да | — | нет | Сумма."},
+        {"atom": "c", "status": "есть", "quote": "| sender_id | BIGINT | да | нет | да (PK) … | transfer_id | BIGINT | да | нет | да (PK) | да | — | PRIMARY KEY | Идентификатор перевода. … | id | BIGINT | да | нет | да (PK)"},
+        {"atom": "d", "status": "есть", "quote": "| transfer_id | BIGINT | нет | transfers(id)"},
+        {"atom": "e", "status": "есть", "quote": "| uq_transfer_history_stage — UNIQUE | transfer_id, stage |"},
+        {"atom": "f", "status": "есть", "quote": "| sender_id | BIGINT | нет | нет | да | да | — | idx_blocked_senders_sender_id; UNIQUE |"}
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "| id | Long | да … | senderId | Long | да … | recipientId | Long | да … | amount | BigDecimal | да … | currency | String | да … | status | String | да … | createdAt | LocalDateTime | да"},
+        {"atom": "b", "status": "есть", "quote": "известные значения из кода: `NEW`, `APPROVED`, `DECLINED`, `COMPLETED`, `CANCELLED`, `DENIED`; тип не ограничен enum."}
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "| Число партиций | 3; `TopicsConfig#transfersTopic`. … 3; `TopicsConfig#limitResultsTopic` … 3; `TopicsConfig#screeningResultsTopic` … | Политика хранения / очистки | `cleanup.policy=compact`"},
+        {"atom": "b", "status": "есть", "quote": "| Ключ сообщения | `Transfer.id()` / ключ Kafka Streams; тип `Long`. … | Сериализация значения | `JsonSerializer<Transfer>`"},
+        {"atom": "c", "status": "есть", "quote": "| Отправители | `transfer-service`: `TransferController#publishNew` … группа `limit`; … группа `screening`; … группа `transfer-tracker`. … | Отправители | `limit-service`: `LimitService#sendAndWait`."}
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Ответ `500` не объявлен ни для `POST /transfers`, ни для `GET /transfers`, ни для `GET /transfers/{id}`."}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K3-S1", "status": "есть", "quote": "| version | BIGINT | нет | нет | нет | да | 0 | нет | Версия записи; отображается как `@Version` в `SenderUsage`. |"},
+    {"id": "K3-S2", "status": "нет", "quote": ""},
+    {"id": "K3-S3", "status": "есть", "quote": "| Отправители | `limit-service`, `screening-service`, `transfer-service`: `KafkaErrorHandlingConfig#kafkaErrorHandler` … 3; `transfer-service` `KafkaErrorHandlingConfig#limitResultsDlt`."},
+    {"id": "K3-S4", "status": "нет", "quote": ""},
+    {"id": "K3-S5", "status": "есть", "quote": "| state | `RESERVED`, `COMMITTED`, `RELEASED`, `NONE` — константы `Reservation`"},
+    {"id": "K3-S6", "status": "есть", "quote": "`DecisionTopologyConfig#decisionStream`, группа Kafka Streams — в коде не найдена."},
+    {"id": "K3-S7", "status": "есть", "quote": "`TransferRequest.currency`: nullable | Поле необязательное, но `nullable: true` отсутствует … `Transfer.updatedAt`: nullable | `type: string`, `nullable: true` отсутствует."},
+    {"id": "K3-S8", "status": "нет", "quote": ""},
+    {"id": "K3-S9", "status": "нет", "quote": ""}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {
+      "quote": "`DelegatingByTypeSerializer`: `LongSerializer` для `Long`, `ByteArraySerializer` для `byte[]`. … | Сериализация значения | `JsonSerializer<Object>` либо `ByteArraySerializer` для `byte[]`.",
+      "code_ref": "limit-service, screening-service, transfer-service KafkaErrorHandlingConfig.kafkaErrorHandler / keySerializer",
+      "explanation": "Для DLT создаются два KafkaTemplate: rawTemplate (ByteArraySerializer) для byte[] и jsonTemplate (new JsonSerializer<>()) для Object; ключ сериализуется DelegatingByTypeSerializer с ByteArraySerializer для byte[] и LongSerializer для Long. В эталоне выбор сериализатора DLT по типу значения и ключа не описан (есть только упоминание JsonSerializer в 4.4 и исходных байт в сценарии 11)."
+    }
+  ],
+  "contamination": [],
+  "notes": "Ошибок, противоречащих коду, не найдено: все 6 таблиц, типы, ограничения, индексы, DEFAULT, группы потребителей, распределение DLT и три расхождения раздела 4 (O1, O6, O7) сверены с 001-create-tables.sql, KafkaErrorHandlingConfig, TopicsConfig, TransferController, TransferRequest и transfer-api.yaml. Пограничные решения: K3-S6 засчитан по сноске 1 раздела 1 эталона («явно не задан» засчитывать): «группа Kafka Streams — в коде не найдена» по смыслу то же, но значение transfer-service (из spring.application.name) модель не вывела. K3-S2 не засчитан: в limitdb и screeningdb в колонке FK стоит «нет», но это заполнение шаблона, логические связи по sender_id не названы. K3-S4 не засчитан: шесть значений status даны одним списком без разбивки по каналам (NEW / APPROVED-DECLINED / финалы). K3-M3(b) закрыт тем же списком. K3-S9 не засчитан: пример createdAt «в коде не найдено», массив не упомянут (утверждения про ISO-строку в Kafka тоже нет, штрафа нет). Пропуски без штрафа: 400 для POST при битом JSON и 400 для GET /transfers/{id} с нечисловым id не указаны; тело 409/400/503 (ProblemDetail) в параметрах ответа не расписано; десериализаторы потребителей (ErrorHandlingDeserializer) не названы. Мелочь, не записанная в errors: для записи Kafka Streams в transfers указан JsonSerde<Transfer>, а фактически .to(\"transfers\") без Produced использует default.value.serde (JsonSerde по имени класса); на формат значения это не влияет. Java-типы встречаются только в колонке «Описание» HTTP-таблиц, колонка «Тип» везде JSON, нарушения формата нет."
+}
