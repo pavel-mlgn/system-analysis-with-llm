@@ -1,0 +1,170 @@
+{
+  "case": "03",
+  "answer_id": "F",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Эндпоинт: POST /transfers… Эндпоинт: GET /transfers… Эндпоинт: GET /transfers/{id}"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "Коды ответа:… 201… 200… 400… 409… 500… 503"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Коды ответа:… 200… 400… 404… 500"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "number (integer)… number (decimal)… string… object… array"
+        }
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Таблица: transfers (база: transferdb)… Таблица: transfer_history (база: transferdb)… Таблица: sender_usage (база: limitdb)… Таблица: reservations (база: limitdb)…"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "amount | DECIMAL(15,2)"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "reservations… transfer_id… PK | да… screening_checks… transfer_id… PK | да"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "transfer_history… transfer_id… FK | transfers(id)"
+        },
+        {
+          "atom": "e",
+          "status": "есть",
+          "quote": "UNIQUE uq_transfer_history_stage | transfer_id, stage"
+        },
+        {
+          "atom": "f",
+          "status": "есть",
+          "quote": "blocked_senders… sender_id… Unique | да"
+        }
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "id | Long… senderId | Long… recipientId | Long… amount | BigDecimal… currency | String… status | String… decidedBy | String… messageInfo | String… createdAt | LocalDateTime"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "Статус перевода / решения (NEW, APPROVED, DECLINED, COMPLETED, CANCELLED, DENIED)"
+        }
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Канал: transfers… Число партиций | 3… Политика хранения / очистки | compact"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "Ключ сообщения | Long (id перевода)… Сериализация значения | JsonSerializer / ErrorHandlingDeserializer (JsonDeserializer)"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Отправители | transfer-service… Получатели (группа потребителей) | limit-service (groupId = \"limit\"), screening-service (groupId = \"screening\"), transfer-service (groupId = \"transfer-tracker\")"
+        }
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "4. РАСХОЖДЕНИЯ КОНТРАКТА API С КОДОМ… Код ответа 400 для GET /transfers/{id}… Не описан… При передаче нечислового id в пути ResponseEntityExceptionHandler возвращает HTTP 400 Bad Request"
+        }
+      ]
+    }
+  ],
+  "strong": [
+    {
+      "id": "K3-S1",
+      "status": "есть",
+      "quote": "version | BIGINT… Версия записи для оптимистической блокировки (@Version)"
+    },
+    {
+      "id": "K3-S2",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K3-S3",
+      "status": "есть",
+      "quote": "transfers.DLT… Отправители | transfer-service, limit-service, screening-service… limit-results.DLT… Отправители | transfer-service"
+    },
+    {
+      "id": "K3-S4",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K3-S5",
+      "status": "есть",
+      "quote": "state | RESERVED, COMMITTED, RELEASED, NONE"
+    },
+    {
+      "id": "K3-S6",
+      "status": "есть",
+      "quote": "transfer-service (Kafka Streams DecisionTopologyConfig#decisionStream, application.id = \"transfer-service\")"
+    },
+    {
+      "id": "K3-S7",
+      "status": "есть",
+      "quote": "Код ответа 400 для GET /transfers/{id}… Не описан… Поле updatedAt в схеме Transfer… Не отмечено как nullable: true"
+    },
+    {
+      "id": "K3-S8",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K3-S9",
+      "status": "нет",
+      "quote": ""
+    }
+  ],
+  "errors": [
+    {
+      "quote": "Тип поля status в схеме Transfer и HistoryEntry | Строго ограниченный enum… | В TransferEntity и TransferHistoryEntry поле status имеет тип String без enum-ограничения",
+      "category": "ложная_аномалия",
+      "etalon_ref": "раздел 6.1",
+      "code_ref": "transfer-common Transfer.java; transfer-service TransferEntity.java",
+      "explanation": "Значения совпадают, это не является расхождением."
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": ""
+}

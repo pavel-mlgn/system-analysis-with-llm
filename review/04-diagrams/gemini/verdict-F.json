@@ -1,0 +1,71 @@
+{
+  "case": "04",
+  "answer_id": "F",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Контейнер: transfer-service... Контейнер: limit-service... Контейнер: screening-service"},
+        {"atom": "b", "status": "есть", "quote": "Контейнер: transfer-db... Контейнер: limit-db... Контейнер: screening-db"},
+        {"atom": "c", "status": "есть", "quote": "broker... Топик: transfers... Топик: limit-results... Топик: screening-results"},
+        {"atom": "d", "status": "есть", "quote": "HTTP REST (POST /transfers... Kafka Producer TCP (broker:29092), топик: transfers"},
+        {"atom": "e", "status": "есть", "quote": "TC -->|\"Kafka Producer TCP (broker:29092), топик: transfers\"| T_TRANSFERS... T_TRANSFERS -->|\"Kafka Consumer TCP (broker:29092), топик: transfers\"| LEL"}
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "TransferRepository.saveAndFlush(TransferEntity status=NEW)... publishNew()... 201 Created (TransferEntity status=NEW)"},
+        {"atom": "b", "status": "есть", "quote": "par Проверка и резервирование лимита в limit-service and Проверка отправителя в screening-service"},
+        {"atom": "c", "status": "есть", "quote": "stream(\"limit-results\")... stream(\"screening-results\")... TransferDecisionService.decide... status=COMPLETED"},
+        {"atom": "d", "status": "есть", "quote": "TEL->>TTS: applyFinalStatus(transfer)... and Подтверждение резерва в limit-service... LEL->>LL: settle(transfer)"}
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Успешное резервирование лимита в limit-service... status=APPROVED... Отказ при проверке отправителя в screening-service... status=DECLINED"},
+        {"atom": "b", "status": "есть", "quote": "usage.reserve(amount)... reservation.approve() устанавливает state=RESERVED"},
+        {"atom": "c", "status": "есть", "quote": "usage.release(amount, reservedOn, today)... reservation.markReleased() переводит резерв в state=RELEASED"}
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "ER-диаграмма базы данных transferdb... limitdb... screeningdb"},
+        {"atom": "b", "status": "есть", "quote": "transfers ||--o{ transfer_history : \"FK transfer_id\""},
+        {"atom": "c", "status": "есть", "quote": "ER-диаграмма объектов, не хранящихся в БД (DTO и сообщения)... Transfer { Long id"},
+        {"atom": "d", "status": "есть", "quote": "logical sender_id... logical id... logical error response"}
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "[*] --> NEW : \"TransferTrackingService.createTransfer()"},
+        {"atom": "b", "status": "есть", "quote": "Checks --> COMPLETED : \"TransferDecisionService.decide():\\nlimit == APPROVED AND screening == APPROVED\"... Checks --> DENIED... Checks --> CANCELLED"},
+        {"atom": "c", "status": "есть", "quote": "COMPLETED --> [*]... DENIED --> [*]... CANCELLED --> [*]"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K4-S1", "status": "нет", "quote": ""},
+    {"id": "K4-S2", "status": "есть", "quote": "переходит либо в NONE (метод decline(), если сумма некорректна или превышен лимит — терминальное состояние), либо в RESERVED"},
+    {"id": "K4-S3", "status": "есть", "quote": "TEL->>TTS: applyFinalStatus(transfer)... and Игнорирование финального статуса в screening-service... screening holds no reservations, nothing to do"},
+    {"id": "K4-S4", "status": "нет", "quote": ""},
+    {"id": "K4-S5", "status": "есть", "quote": "DECIMAL_15_2 amount \"NOT NULL\"... VARCHAR_10 currency \"NOT NULL DEFAULT RUB\"... BIGINT sender_id UK \"NOT NULL UNIQUE\""},
+    {"id": "K4-S6", "status": "есть", "quote": "sender_usage |o..o{ reservations : \"logical sender_id\""},
+    {"id": "K4-S7", "status": "есть", "quote": "OR (limit == APPROVED AND screening == DECLINED, decidedBy='screening')\\nOR иные статусы (UNEXPECTED_RESULT)"}
+  ],
+  "errors": [
+    {
+      "quote": "Логические связи между сущностями разных диаграмм:... Остальные сущности с жизненным циклом (статусами)...",
+      "category": "нарушение_формата",
+      "etalon_ref": "раздел 0.3",
+      "code_ref": "-",
+      "explanation": "Нарушено явное требование промпта «Между диаграммами — только заголовок и 1–2 предложения». Модель вывела большие списки описаний связей и состояний."
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Модель сгруппировала все DLT-топики в одну ноду в Component diagram и провела к ней связи от всех ErrorHandler, что скрывает, что *-results.DLT объявляются только в transfer-service, но это упрощение, а не прямая ошибка, K4-S4 не засчитан."
+}

@@ -1,0 +1,186 @@
+{
+  "case": "01",
+  "answer_id": "F",
+  "mandatory": [
+    {
+      "id": "K1-M1",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Система предназначена для приёма, проверки и проведения денежных переводов между отправителями и получателями"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "контроль дневных и месячных лимитов отправителя"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "скрининг отправителя по списку заблокированных лиц (фрод, санкции и др.)"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "По результатам обеих проверок перевод либо успешно исполняется с фиксацией израсходованного лимита, либо отклоняется/отменяется"
+        }
+      ]
+    },
+    {
+      "id": "K1-M2",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "координацией через брокер сообщений … В коде не найдено (межсервисное взаимодействие полностью асинхронное; HTTP REST API в `transfer-service` используется только для внешних вызовов)"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "публикует событие в Kafka, которое параллельно обрабатывают `limit-service` и `screening-service`"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "их ответы объединяются (join) в `transfer-service` через Kafka Streams для вынесения финального решения"
+        }
+      ]
+    },
+    {
+      "id": "K1-M3",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "`transfer-common` | библиотека | нет … `transfer-service` | сервис | есть … `limit-service` | сервис | нет … `screening-service` | сервис | нет"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "`transfer-common` | библиотека | нет | Содержит общую DTO-модель перевода"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "`transfer-service` | сервис | есть (REST: `/transfers`, `/transfers/{id}`) … `limit-service` | сервис | нет … `screening-service` | сервис | нет"
+        }
+      ]
+    },
+    {
+      "id": "K1-M4",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Java 21 (Eclipse Temurin 21)"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "Spring Boot 3.4.1"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Spring for Apache Kafka, Apache Kafka Streams, Apache Kafka"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "PostgreSQL 16 (`postgres:16-alpine`), Liquibase"
+        }
+      ]
+    },
+    {
+      "id": "K1-M5",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Топик `transfers` … `transfer-service` — `TransferController.publishNew` … `DecisionTopologyConfig.decisionStream` … (группа `limit`) … (группа `screening`) … (группа `transfer-tracker`)"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "`limit-service` — `LimitService.sendAndWait` … `screening-service` — `ScreeningService.sendAndWait` … `DecisionTopologyConfig.decisionStream` (Kafka Streams) … (группа `transfer-tracker`)"
+        }
+      ]
+    },
+    {
+      "id": "K1-M6",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "образ `confluentinc/cp-kafka:7.6.0`"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "образ `postgres:16-alpine` в виде трёх изолированных инстансов … `transfer-db` (база `transferdb`) — для `transfer-service` … для `limit-service` … для `screening-service`"
+        }
+      ]
+    }
+  ],
+  "strong": [
+    {
+      "id": "K1-S1",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S2",
+      "status": "есть",
+      "quote": "Kafka Streams; `application.id` явно в коде не задан, по умолчанию используется `spring.application.name`: `transfer-service`"
+    },
+    {
+      "id": "K1-S3",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S4",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S5",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S6",
+      "status": "есть",
+      "quote": "режим KRaft … (1 узел в роли `broker,controller`)"
+    }
+  ],
+  "errors": [
+    {
+      "quote": "(`transfers.DLT`, `limit-results.DLT`, `screening-results.DLT`) … обработчики ошибок `KafkaErrorHandlingConfig.kafkaErrorHandler` (`DeadLetterPublishingRecoverer`) во всех трёх сервисах",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "раздел 1, «Каналы Kafka»; раздел 5.1; раздел 8, «`*-results.DLT` пишут все сервисы»",
+      "code_ref": "limit-service и screening-service: TransferEventsListener.onEvent (topics = \"transfers\"), KafkaErrorHandlingConfig.kafkaErrorHandler (TopicPartition(record.topic() + \".DLT\", ...)), KafkaErrorHandlingConfig.transfersDlt как единственный объявленный DLT; transfer-service: KafkaErrorHandlingConfig.limitResultsDlt/screeningResultsDlt, TransferEventListener.onEvent (topics transfers, limit-results, screening-results)",
+      "explanation": "DLT выбирается как «прочитанный топик + .DLT». limit-service и screening-service читают только `transfers` и объявляют только `transfers.DLT`, поэтому пишут только в него. `limit-results.DLT` и `screening-results.DLT` объявляет и пишет только transfer-service (обработчик ошибок трекера). В ответе для всех трёх DLT отправителями указаны обработчики во всех трёх сервисах, хотя раздел построен по схеме «топик → отправители»."
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "Java 21 (Eclipse Temurin 21), Maven 3.9.9",
+      "code_ref": "Dockerfile: FROM maven:3.9.9-eclipse-temurin-21 (стадии poms и build), FROM eclipse-temurin:21-jre",
+      "explanation": "Это версия Maven и дистрибутив JDK/JRE (Eclipse Temurin) сборочного и рабочего образов. В эталоне указаны только Java 21 и JRE 21."
+    },
+    {
+      "quote": "`limit-service` — `LimitService.sendAndWait` … `screening-service` — `ScreeningService.sendAndWait`",
+      "code_ref": "LimitService.sendAndWait (template.send(\"limit-results\", ...).get(10, SECONDS)); ScreeningService.sendAndWait (template.send(\"screening-results\", ...).get(10, SECONDS))",
+      "explanation": "Приватные методы-продюсеры топиков ответов существуют. В списке «Не маркеры» раздела 8 их нет: стоит добавить, чтобы не засчитывать их как галлюцинацию."
+    },
+    {
+      "quote": "скрининг отправителя по списку заблокированных лиц (фрод, санкции и др.)",
+      "code_ref": "screening-service db/changelog/002-insert-test-data.sql (reason: 'Fraud detected', 'Sanctions list', 'Suspicious activity', 'Identity theft report', 'Court order')",
+      "explanation": "Категории причин блокировки соответствуют тестовому стоп-листу. В эталоне (S5) перечислены только senderId."
+    }
+  ],
+  "contamination": [],
+  "notes": "K1-M3(a) закрыт таблицей, где перечислены ровно четыре модуля: числа нет, но перечень однозначен. K1-S6 засчитан по ядру пункта: из перечня в ответе есть только KRaft (один узел broker,controller) и версии образов из Dockerfile, а порты, healthcheck, ARG MODULE и тома не названы. При более строгом прочтении пункт не закрыт. K1-S1 не закрыт: DLT-топики сгруппированы без распределения, а запись во все три DLT приписана всем трём сервисам. Это внесено как мелкая ошибка по разделу 8. Сомнительные места, не внесённые в errors. 1) «отклоняется/отменяется с возвратом зарезервированного лимита» — упрощение. Лимит возвращается только при наличии резерва (limit APPROVED + screening DECLINED или UNEXPECTED_RESULT при RESERVED); при отказе limit и при DENIED резерва нет. Формулировка ограничена словом «зарезервированного», а итоговый эффект (отклонённый перевод не расходует лимит) верен, поэтому искажение «CANCELLED всегда возвращает лимит» не засчитано. 2) «проведения денежных переводов», «успешно исполняется»: фактического движения денег в системе нет (эталон, раздел 1), но счета и балансы в ответе не упоминаются. Трактовано как бизнес-формулировка статуса COMPLETED. K1-S5 не закрыт: в ответе нет ни кода 201, ни асинхронного получения итога клиентом. Расхождений эталона с кодом по кейсу 1 не найдено."
+}

@@ -1,0 +1,170 @@
+{
+  "case": "01",
+  "answer_id": "F",
+  "mandatory": [
+    {
+      "id": "K1-M1",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Система предназначена для приёма, проверки и проведения денежных переводов"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "контроль дневных и месячных лимитов отправителя"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "скрининг отправителя по списку заблокированных лиц"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "По результатам обеих проверок перевод либо успешно исполняется... либо отклоняется/отменяется"
+        }
+      ]
+    },
+    {
+      "id": "K1-M2",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "координацией через брокер сообщений... В коде не найдено (межсервисное взаимодействие полностью асинхронное"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "событие в Kafka, которое параллельно обрабатывают limit-service и screening-service"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "ответы объединяются (join) в transfer-service через Kafka Streams для вынесения финального решения"
+        }
+      ]
+    },
+    {
+      "id": "K1-M3",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "transfer-common | библиотека... transfer-service | сервис... limit-service | сервис... screening-service | сервис"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "transfer-common | библиотека"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "transfer-service | сервис | есть (REST: /transfers, /transfers/{id})... limit-service | сервис | нет... screening-service | сервис | нет"
+        }
+      ]
+    },
+    {
+      "id": "K1-M4",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Java 21 (Eclipse Temurin 21)"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "Spring Boot 3.4.1"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Apache Kafka Streams, Apache Kafka"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "PostgreSQL 16... Liquibase"
+        }
+      ]
+    },
+    {
+      "id": "K1-M5",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Отправляют: transfer-service... Получают: limit-service (группа limit), screening-service (группа screening), transfer-service (группа transfer-tracker)"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "limit-results: Отправляет: limit-service... Получают: transfer-service... screening-results: Отправляет: screening-service... Получают: transfer-service"
+        }
+      ]
+    },
+    {
+      "id": "K1-M6",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "образ confluentinc/cp-kafka:7.6.0"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "postgres:16-alpine в виде трёх изолированных инстансов: transfer-db... limit-db... screening-db"
+        }
+      ]
+    }
+  ],
+  "strong": [
+    {
+      "id": "K1-S1",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S2",
+      "status": "есть",
+      "quote": "application.id явно в коде не задан, по умолчанию используется spring.application.name: transfer-service"
+    },
+    {
+      "id": "K1-S3",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S4",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S5",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K1-S6",
+      "status": "нет",
+      "quote": ""
+    }
+  ],
+  "errors": [
+    {
+      "quote": "Топики недоставленных сообщений (transfers.DLT, limit-results.DLT, screening-results.DLT): Отправляют: обработчики ошибок... во всех трёх сервисах",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "раздел 8",
+      "code_ref": "limit-service/.../KafkaErrorHandlingConfig.java; screening-service/.../KafkaErrorHandlingConfig.java",
+      "explanation": "Сервисы limit-service и screening-service не объявляют топики *-results.DLT и не отправляют в них сообщения. Утверждение, что они используются во всех трех сервисах, ошибочно."
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": ""
+}

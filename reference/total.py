@@ -10,6 +10,7 @@ NAMES = {
     "chatgpt-gpt-5.6-sol-high": "ChatGPT GPT-5.6 Sol High",
     "deepseek-v4.1-flash-deepthink": "DeepSeek V4.1-Flash DeepThink",
     "gemini-3.1-pro-high": "Gemini 3.1 Pro High",
+    "gemini-4-argon-high": "Gemini 4 Argon High",
 }
 CASES = ["01-recon", "02-business-logic", "03-specs", "04-diagrams", "05-change-request"]
 

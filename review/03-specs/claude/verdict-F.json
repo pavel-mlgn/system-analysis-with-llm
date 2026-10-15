@@ -1,0 +1,88 @@
+{
+  "case": "03",
+  "answer_id": "F",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Эндпоинт: POST /transfers … Эндпоинт: GET /transfers … Эндпоинт: GET /transfers/{id}"},
+        {"atom": "b", "status": "есть", "quote": "| 201 | Новый перевод успешно создан … | 200 | Перевод с указанным `id` … | 400 | Ошибка валидации тела запроса … | 409 | Перевод с указанным `id` уже существует … | 503 | Ошибка или таймаут"},
+        {"atom": "c", "status": "есть", "quote": "| 200 | Перевод найден | … | 404 | Перевод с указанным `id` не найден |"},
+        {"atom": "d", "status": "есть", "quote": "| id | body | number (integer) | да (`@NotNull`) | … | amount | body | number (decimal) | … | currency | body | string |"}
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Таблица: transfers (база: transferdb) … transfer_history … Таблица: sender_usage (база: limitdb) … Таблица: reservations … Таблица: blocked_senders (база: screeningdb) … Таблица: screening_checks"},
+        {"atom": "b", "status": "есть", "quote": "| amount | DECIMAL(15,2) | нет | нет | нет | да | нет | нет | Сумма перевода |"},
+        {"atom": "c", "status": "есть", "quote": "reservations (база: limitdb) … | transfer_id | BIGINT | да | … screening_checks (база: screeningdb) … | transfer_id | BIGINT | да |"},
+        {"atom": "d", "status": "есть", "quote": "| transfer_id | BIGINT | нет | `transfers(id)` | нет | да |"},
+        {"atom": "e", "status": "есть", "quote": "| UNIQUE `uq_transfer_history_stage` | `transfer_id, stage` |"},
+        {"atom": "f", "status": "есть", "quote": "Таблица: blocked_senders (база: screeningdb) … | sender_id | BIGINT | нет | нет | да | да | нет | `idx_blocked_senders_sender_id`, UNIQUE |"}
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "id | Long … senderId | Long … recipientId | Long … amount | BigDecimal … currency | String … status | String … decidedBy | String … messageInfo | String … createdAt | LocalDateTime"},
+        {"atom": "b", "status": "есть", "quote": "| status | String | нет | Статус перевода / решения (`NEW`, `APPROVED`, `DECLINED`, `COMPLETED`, `CANCELLED`, `DENIED`)"}
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "| Число партиций | 3 (`TopicsConfig#transfersTopic`) | … | Политика хранения / очистки | `compact` | … 3 (`TopicsConfig#limitResultsTopic`) … 3 (`TopicsConfig#screeningResultsTopic`)"},
+        {"atom": "b", "status": "есть", "quote": "| Ключ сообщения | `Long` (`id` перевода) | … | Сериализация значения | `JsonSerializer` /"},
+        {"atom": "c", "status": "есть", "quote": "| Отправители | `transfer-service` … `limit-service` (`groupId = \"limit\"`), `screening-service` (`groupId = \"screening\"`), `transfer-service` (`groupId = \"transfer-tracker\"`)"}
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "| Код ответа `500` для всех эндпоинтов (`POST /transfers`, `GET /transfers`, `GET /transfers/{id}`) | Не описан |"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K3-S1", "status": "есть", "quote": "| version | BIGINT | нет | нет | нет | да | `0` | нет | Версия записи для оптимистической блокировки (`@Version`) |"},
+    {"id": "K3-S2", "status": "нет", "quote": ""},
+    {"id": "K3-S3", "status": "есть", "quote": "Канал: transfers.DLT … | Отправители | `transfer-service`, `limit-service`, `screening-service` … 3 (`transfer-service/.../config/KafkaErrorHandlingConfig#limitResultsDlt`)"},
+    {"id": "K3-S4", "status": "нет", "quote": ""},
+    {"id": "K3-S5", "status": "есть", "quote": "| state | `RESERVED`, `COMMITTED`, `RELEASED`, `NONE` |"},
+    {"id": "K3-S6", "status": "есть", "quote": "`transfer-service` (Kafka Streams `DecisionTopologyConfig#decisionStream`, `application.id = \"transfer-service\"`)"},
+    {"id": "K3-S7", "status": "есть", "quote": "| Код ответа `400` для `GET /transfers/{id}` | Не описан | … | Поле `updatedAt` в схеме `Transfer` | Не отмечено как `nullable: true` | … Секция `required` отсутствует во всех схемах ответов"},
+    {"id": "K3-S8", "status": "нет", "quote": ""},
+    {"id": "K3-S9", "status": "нет", "quote": ""}
+  ],
+  "errors": [
+    {
+      "quote": "Строго ограниченный `enum` (`TransferStatus` и встроенный `enum` в `HistoryEntry`) | В `TransferEntity` и `TransferHistoryEntry` поле `status` имеет тип `String` без enum-ограничения",
+      "category": "ложная_аномалия",
+      "etalon_ref": "6.1 (выдуманные расхождения: enum в контракте против String в коде)",
+      "code_ref": "transfer-service/src/main/resources/openapi/transfer-api.yaml (TransferStatus, HistoryEntry.status); TransferDecisionService.decide; TransferTrackingService.createTransfer / recordServiceResult / applyFinalStatus; LimitService.onNewTransfer; ScreeningService.onNewTransfer",
+      "explanation": "Код пишет в transfers.status только NEW/COMPLETED/CANCELLED/DENIED, в историю дополнительно APPROVED/DECLINED, и эти значения совпадают с enum контракта. Ветка UNEXPECTED_RESULT пишет статус CANCELLED (он входит в enum), а UNEXPECTED_RESULT попадает в messageInfo. Эталон прямо относит это к выдуманным расхождениям."
+    },
+    {
+      "quote": "| createdAt | LocalDateTime | нет | Дата и время создания перевода | `\"2025-05-01T10:15:30\"` |",
+      "category": "неточность",
+      "etalon_ref": "4.4; раздел 8 (Частые искажения: createdAt в Kafka — ISO-строка)",
+      "code_ref": "application.yml всех трёх сервисов (spring.kafka.producer.value-serializer: JsonSerializer по имени класса); DecisionTopologyConfig.decisionStream (new JsonSerde<>(Transfer.class)); KafkaErrorHandlingConfig.kafkaErrorHandler (new JsonSerializer<>())",
+      "explanation": "Сериализаторы spring-kafka используют собственный ObjectMapper, а не ObjectMapper Spring Boot, и WRITE_DATES_AS_TIMESTAMPS в нём не отключён. Поэтому LocalDateTime в Kafka пишется массивом [год, месяц, день, час, мин, сек, нано] из 5–7 элементов, а не ISO-строкой. Это проверено запуском (эталон 4.4)."
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "| Сериализация ключа | `DelegatingByTypeSerializer` (`LongSerializer` для `Long`, `ByteArraySerializer` для `byte[]`) |",
+      "code_ref": "KafkaErrorHandlingConfig.keySerializer / kafkaErrorHandler (transfer-service, limit-service, screening-service)",
+      "explanation": "Ключи DLT сериализуются DelegatingByTypeSerializer: Long идёт в LongSerializer, byte[] (сырой ключ при ошибке десериализации) — в ByteArraySerializer. Шаблон для значения выбирается по типу: byte[] — ByteArraySerializer, прочее — JsonSerializer. В эталоне сериализатор ключей DLT не описан."
+    },
+    {
+      "quote": "| type | string | да | URI типа ошибки в формате RFC 7807 `ProblemDetail` (при кодах 400, 409, 500, 503) |",
+      "code_ref": "ApiExceptionHandler.handleUnexpected; TransferController.duplicate (ProblemDetail.forStatusAndDetail); transfer-service application.yml (spring.mvc.problemdetails.enabled: true)",
+      "explanation": "Тело ошибок 400/409/500/503 — ProblemDetail (RFC 7807) с полями type, title, status, detail, instance. В эталоне указан только тип application/problem+json, без структуры полей."
+    }
+  ],
+  "contamination": [],
+  "notes": "K3-S2 не засчитан: в таблицах limitdb и screeningdb колонка FK заполнена «нет» по шаблону, но логический характер связей (reservations.sender_id ↔ sender_usage.sender_id, screening_checks.sender_id ↔ blocked_senders.sender_id) нигде не назван. K3-M3(b) закрыт общим перечнем значений status. Разбиения на три набора по каналам нет, поэтому K3-S4 — «нет». K3-M5 закрыт строкой про 500 (O1, в S7 не идёт). K3-S7 закрыт расхождениями O2, O5, O7, а также O4 (формат дат). Nullable «да» для updatedAt в HTTP-ответах соответствует схеме БД (O7) и не штрафуется. В разделе 4 утверждение о сериализации LocalDateTime в ISO-8601 относится к REST (ObjectMapper Spring Boot) и верно. Формально LocalDateTime выводится без смещения, поэтому строгому format: date-time (RFC 3339) он тоже не соответствует; это не штрафуется. Маркеров контаминации нет. Расхождений эталона с кодом по пунктам кейса не выявлено."
+}

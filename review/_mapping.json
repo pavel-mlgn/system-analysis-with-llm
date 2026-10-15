@@ -24,6 +24,11 @@
       "source": "experiment/01-recon/answer-claude-opus-5.5-high.md",
       "model": "claude-opus-5.5-high",
       "markers_removed": 0
+    },
+    "F": {
+      "source": "experiment/01-recon/answer-gemini-4-argon-high.md",
+      "model": "gemini-4-argon-high",
+      "markers_removed": 0
     }
   },
   "02": {
@@ -50,6 +55,11 @@
     "E": {
       "source": "experiment/02-business-logic/answer-claude-opus-5.5-max.md",
       "model": "claude-opus-5.5-max",
+      "markers_removed": 0
+    },
+    "F": {
+      "source": "experiment/02-business-logic/answer-gemini-4-argon-high.md",
+      "model": "gemini-4-argon-high",
       "markers_removed": 0
     }
   },
@@ -78,6 +88,11 @@
       "source": "experiment/03-specs/answer-deepseek-v4.1-flash-deepthink.md",
       "model": "deepseek-v4.1-flash-deepthink",
       "markers_removed": 0
+    },
+    "F": {
+      "source": "experiment/03-specs/answer-gemini-4-argon-high.md",
+      "model": "gemini-4-argon-high",
+      "markers_removed": 0
     }
   },
   "04": {
@@ -105,6 +120,11 @@
       "source": "experiment/04-diagrams/answer-deepseek-v4.1-flash-deepthink.md",
       "model": "deepseek-v4.1-flash-deepthink",
       "markers_removed": 0
+    },
+    "F": {
+      "source": "experiment/04-diagrams/answer-gemini-4-argon-high.md",
+      "model": "gemini-4-argon-high",
+      "markers_removed": 0
     }
   },
   "05": {
@@ -131,6 +151,11 @@
     "E": {
       "source": "experiment/05-change-request/answer-gemini-3.1-pro-high.md",
       "model": "gemini-3.1-pro-high",
+      "markers_removed": 0
+    },
+    "F": {
+      "source": "experiment/05-change-request/answer-gemini-4-argon-high.md",
+      "model": "gemini-4-argon-high",
       "markers_removed": 0
     }
   }

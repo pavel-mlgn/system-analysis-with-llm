@@ -1,0 +1,188 @@
+{
+  "case": "04",
+  "answer_id": "F",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Контейнер: transfer-service (Spring Boot, порт 8080) … Контейнер: limit-service (Spring Boot) … Контейнер: screening-service (Spring Boot)"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "БД: transferdb (таблицы: transfers, transfer_history) … БД: limitdb (таблицы: sender_usage, reservations) … БД: screeningdb (таблицы: blocked_senders, screening_checks)"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Топик: transfers (3 partitions, compact) … Топик: limit-results (3 partitions, compact) … Топик: screening-results (3 partitions, compact)"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "HTTP REST (POST /transfers, GET /transfers, GET /transfers/{id}) … JDBC PostgreSQL (transfer-db:5432/transferdb) … Kafka Producer TCP (broker:29092), топик: transfers"
+        },
+        {
+          "atom": "e",
+          "status": "есть",
+          "quote": "T_TRANSFERS -->|\"Kafka Consumer TCP (broker:29092), топик: transfers\"| LEL … LS -->|\"Kafka Producer TCP (broker:29092), топик: limit-results\"| T_LIMIT"
+        }
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "TransferRepository.saveAndFlush(TransferEntity status=NEW) … publishNew() -> KafkaTemplate.send(\"transfers\", id, Transfer status=NEW) … 201 Created (TransferEntity status=NEW)"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "par Проверка и резервирование лимита в limit-service … and Проверка отправителя в screening-service"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Объединение решений в Kafka Streams (JoinWindows 10s) … TransferDecisionService.decide(limitResult, screeningResult) … DS->>KT: to(\"transfers\") (Transfer status=COMPLETED)"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "KT->>TEL: onEvent(Transfer status=COMPLETED, topic=\"transfers\") … KT->>LEL: onEvent(Transfer status=COMPLETED) -> onFinalStatus(transfer)"
+        }
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Отказ при проверке отправителя в screening-service … ScreeningCheckRepository.save(result=DECLINED, reason=\"SENDER_BLOCKED\")"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "Успешное резервирование лимита в limit-service … reservation.approve() устанавливает state=RESERVED"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Компенсация (возврат) зарезервированного лимита в limit-service … reservation.markReleased() переводит резерв в state=RELEASED"
+        }
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "ДИАГРАММА 4а: ER-диаграмма базы данных `transferdb` … ДИАГРАММА 4б: ER-диаграмма базы данных `limitdb` … ДИАГРАММА 4в: ER-диаграмма базы данных `screeningdb`"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "transfers ||--o{ transfer_history : \"FK transfer_id\" … нет внешнего ключа, но имеется логическая связь по полю `sender_id` … без ограничения внешнего ключа"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "ДИАГРАММА 4г: ER-диаграмма объектов, не хранящихся в БД (DTO и сообщения) … Long id \"id перевода (ключ сообщения Kafka)\""
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "blocked_senders |o..o{ screening_checks : \"logical sender_id\" … Логические связи между сущностями разных диаграмм"
+        }
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "[*] --> NEW : \"TransferTrackingService.createTransfer()"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "Checks --> COMPLETED : … limit == APPROVED AND screening == APPROVED … Checks --> DENIED : … limit == DECLINED AND screening == DECLINED … Checks --> CANCELLED :"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "COMPLETED --> [*] … DENIED --> [*] … CANCELLED --> [*]"
+        }
+      ]
+    }
+  ],
+  "strong": [
+    {
+      "id": "K4-S1",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K4-S2",
+      "status": "есть",
+      "quote": "переходит либо в `NONE` (метод `decline()`, если сумма некорректна или превышен лимит — терминальное состояние), либо в `RESERVED` … переходит в `COMMITTED` … или в `RELEASED`"
+    },
+    {
+      "id": "K4-S3",
+      "status": "есть",
+      "quote": "participant TEL as \"TransferEventListener (transfer-service)\" … Игнорирование финального статуса в screening-service … Логирование: screening holds no reservations, nothing to do"
+    },
+    {
+      "id": "K4-S4",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K4-S5",
+      "status": "есть",
+      "quote": "DECIMAL_15_2 amount \"NOT NULL\" … BIGINT transfer_id FK \"NOT NULL, UK(transfer_id, stage)\" … BIGINT sender_id UK \"NOT NULL UNIQUE\""
+    },
+    {
+      "id": "K4-S6",
+      "status": "есть",
+      "quote": "sender_usage |o..o{ reservations : \"logical sender_id\" … `sender_usage.sender_id` (4б, `N:0..1`)"
+    },
+    {
+      "id": "K4-S7",
+      "status": "есть",
+      "quote": "OR иные статусы (UNEXPECTED_RESULT)"
+    }
+  ],
+  "errors": [
+    {
+      "quote": "`limit-service` одобряет перевод и резервирует средства отправителя (`state=RESERVED`)",
+      "category": "неточность",
+      "etalon_ref": "раздел 8, «Частые искажения»: «резервирование средств / денег»; раздел 0.3",
+      "code_ref": "limit-service LimitLedger.decide; SenderUsage.reserve; Reservation.approve",
+      "explanation": "Резервируется лимит. SenderUsage.reserve увеличивает счётчики dailyUsed/monthlyUsed, Reservation.approve ставит state=RESERVED. Средства отправителя система не резервирует и не блокирует: движения денег в коде нет."
+    },
+    {
+      "quote": "`TransferRequest.id` (4г) ↔ `transfers.id` (4а, `1:1`): HTTP-запрос создаёт запись перевода в `transferdb` с тем же `id`.",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "раздел 9.4 (ошибка: связь TransferRequest как 1:1 с хранимой сущностью); раздел 0.3 (неверная кардинальность)",
+      "code_ref": "transfer-service TransferController.create, TransferController.duplicate; TransferRequest",
+      "explanation": "Запись в transfers создаёт только первый запрос с данным id. Повторный POST с тем же id возвращает существующий перевод (200) или 409, невалидный запрос получает 400 и ничего не создаёт. На один перевод приходится 1..N запросов, а запрос порождает 0..1 запись, поэтому связь не 1:1."
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "ProblemDetail { … URI type \"тип ошибки RFC 7807\" … int status \"400, 409, 500, 503\" … URI instance \"URI эндпоинта\"",
+      "code_ref": "transfer-service ApiExceptionHandler.handleUnexpected и TransferController.duplicate (ProblemDetail.forStatusAndDetail); application.yml spring.mvc.problemdetails.enabled: true",
+      "explanation": "Ошибки REST передаются объектом Spring ProblemDetail (RFC 7807) с полями type, title, status, detail, instance. Тело ProblemDetail возвращается для кодов 400/409/500/503, у 404 тела нет. В эталоне структура объекта ошибки как передаваемой сущности не описана."
+    }
+  ],
+  "contamination": [],
+  "notes": "Все пять обязательных групп закрыты полностью. K4-S1 не засчитан: ветка «нет пары ответов в окне 10 с — перевод остаётся NEW» не показана ни на sequence-диаграммах, ни на диаграмме состояний; окно упомянуто только как «JoinWindows 10s». K4-S4 не засчитан: все три DLT-топика объединены в один узел, в который ведут стрелки от обработчиков ошибок всех трёх сервисов. Из диаграммы не видно, что limit-results.DLT и screening-results.DLT пишет только transfer-service. Как ошибку «*-results.DLT пишут все сервисы» это не записываю: явного утверждения нет. Сомнительное место в диаграмме 5: после NEW введено составное состояние «Параллельная проверка» с подсостояниями LIMIT_APPROVED…SCREENING_DECLINED. Это метки, а не константы кода: в коде APPROVED/DECLINED — статусы сообщений в limit-results/screening-results, а TransferEntity.status остаётся NEW до TransferTrackingService.applyFinalStatus. Кроме того, applyFinalStatus подписан на переходе финальных статусов в [*], хотя именно он переводит сущность в финальный статус. Составное состояние явно помечено «(сообщения Transfer)», поэтому не засчитано ни как искажение «статус перевода меняется на APPROVED/DECLINED», ни как неверный переход. Как неоднозначные в errors не записаны: (1) связь HistoryStage ||..o{ Transfer «logical status/stage» — в коде этап определяется топиком в TransferEventListener, поля этапа в Transfer нет; (2) кардинальности «reservations.sender_id (1:N)» и «screening_checks.sender_id (1:N)» относительно transfers.sender_id — sender_id не ключ, связь по нему N:M; (3) transfers ||--o{ transfer_history — 0..N, в эталоне 1..4, на уровне схемы допустимо; (4) запись sendAndWait(\"limit-results\", …) на диаграмме 3 — в коде sendAndWait(Transfer), топик зашит в методе; (5) release описан как вычитание из обоих счётчиков без условия периода — для сценария в пределах одних суток это верно. Расхождений эталона с кодом не выявлено."
+}

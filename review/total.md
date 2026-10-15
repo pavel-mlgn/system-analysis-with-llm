@@ -3,6 +3,7 @@
 | Claude Opus 5.5 Max | 13 | 15 | 15 | 13 | 16 | **72** | 95% |
 | Claude Opus 5.5 High | 9 | 15 | 13,5 | 14 | 16 | **67,5** | 89% |
 | ChatGPT GPT-5.6 Sol High | 10 | 13 | 12 | 10 | 11 | **56** | 74% |
+| Gemini 4 Argon High | 8 | 11 | 10,5 | 10,5 | 11 | **51** | 67% |
 | DeepSeek V4.1-Flash DeepThink | 8 | 7 | 10 | 4,5 | 8,5 | **38** | 50% |
 | Gemini 3.1 Pro High | 5,5 | 6 | 4 | 5 | 3 | **23,5** | 31% |
 
@@ -13,5 +14,6 @@
 | Claude Opus 5.5 Max | 1 | 0 | 0 | 0 | 0 | 1 | 0 |
 | Claude Opus 5.5 High | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | ChatGPT GPT-5.6 Sol High | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
+| Gemini 4 Argon High | 4 | 2 | 1 | 0 | 0 | 2 | 0 |
 | DeepSeek V4.1-Flash DeepThink | 3 | 5 | 4 | 0 | 0 | 1 | 1 |
 | Gemini 3.1 Pro High | 5 | 4 | 4 | 0 | 3 | 3 | 0 |
