@@ -1,0 +1,176 @@
+{
+  "case": "03",
+  "answer_id": "G",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "POST /transfers… GET /transfers… GET /transfers/{id}"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "201… 200… 400… 409… 503"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "200… 404"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "integer (int64)… number… string… array<object>"
+        }
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "sender_usage (база: limitdb)… reservations (база: limitdb)… blocked_senders (база: screeningdb)… screening_checks (база: screeningdb)… transfers (база: transferdb)… transfer_history (база: transferdb)"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "DECIMAL(15,2)"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "transfer_id | BIGINT | да… transfer_id | BIGINT | да"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "transfers(id)"
+        },
+        {
+          "atom": "e",
+          "status": "есть",
+          "quote": "uq_transfer_history_stage — UNIQUE… transfer_id, stage"
+        },
+        {
+          "atom": "f",
+          "status": "есть",
+          "quote": "idx_blocked_senders_sender_id; также индекс UNIQUE"
+        }
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "id | Long… senderId | Long… recipientId | Long… amount | BigDecimal… currency | String… status | String… decidedBy | String… messageInfo | String… createdAt | LocalDateTime"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "NEW, APPROVED, DECLINED, COMPLETED, CANCELLED или DENIED"
+        }
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "transfers… limit-results… screening-results… Число партиций | 3… compact"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "Ключ сообщения | Long — идентификатор перевода Transfer.id… Сериализация значения | JSON: JsonSerializer"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Отправители | transfer-service: TransferController.java… Получатели | limit-service… группа limit… screening-service… группа screening… transfer-service… группа transfer-tracker"
+        }
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Ответ 500 для POST /transfers… Не описан… Ответ 400 для GET /transfers/{id}… Не описан… Transfer.updatedAt… nullable: true отсутствует"
+        }
+      ]
+    }
+  ],
+  "strong": [
+    {
+      "id": "K3-S1",
+      "status": "есть",
+      "quote": "version | BIGINT… Версия записи."
+    },
+    {
+      "id": "K3-S2",
+      "status": "есть",
+      "quote": "reservations… FK | нет… sender_usage… FK | нет… blocked_senders… FK | нет"
+    },
+    {
+      "id": "K3-S3",
+      "status": "есть",
+      "quote": "transfers.DLT… Отправители | limit-service, screening-service, transfer-service… limit-results.DLT… Отправители | transfer-service"
+    },
+    {
+      "id": "K3-S4",
+      "status": "есть",
+      "quote": "transfers… Значения status | NEW, COMPLETED, CANCELLED, DENIED… limit-results… Значения status | APPROVED, DECLINED"
+    },
+    {
+      "id": "K3-S5",
+      "status": "есть",
+      "quote": "state | RESERVED, COMMITTED, RELEASED, NONE"
+    },
+    {
+      "id": "K3-S6",
+      "status": "есть",
+      "quote": "группа определяется application.id, значение в коде не найдено"
+    },
+    {
+      "id": "K3-S7",
+      "status": "есть",
+      "quote": "Ответ 400 для GET /transfers/{id}… Не описан… Transfer.updatedAt… nullable: true отсутствует"
+    },
+    {
+      "id": "K3-S8",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K3-S9",
+      "status": "нет",
+      "quote": ""
+    }
+  ],
+  "errors": [
+    {
+      "quote": "\"2026-01-15T10:15:30\"",
+      "category": "неточность",
+      "etalon_ref": "раздел 4.4",
+      "code_ref": "Transfer (используется JsonSerializer Spring Kafka)",
+      "explanation": "Spring Kafka сериализует LocalDateTime в JSON как массив чисел (например, [2026,1,15,10,15,30]), а не как ISO-строку."
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "null явно обрабатывается в LimitLedger.decide, хотя HTTP-источник задаёт @NotNull",
+      "code_ref": "LimitLedger.decide; TransferRequest",
+      "explanation": "Отличное наблюдение: бизнес-логика страхуется от null в amount, несмотря на наличие аннотации @NotNull в слое REST-контроллера, что делает сервис более устойчивым к сообщениям, поступившим напрямую в топик."
+    }
+  ],
+  "contamination": [],
+  "notes": "Модель отлично справилась со спецификациями, выявив реальные расхождения контракта и точно определив отсутствие внешних ключей в limitdb и screeningdb, а также явно указав группы Kafka Streams и отсутствие читателей DLT-топиков."
+}

@@ -1,0 +1,82 @@
+{
+  "case": "01",
+  "answer_id": "G",
+  "mandatory": [
+    {
+      "id": "K1-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Система принимает заявки на денежные переводы через REST"},
+        {"atom": "b", "status": "есть", "quote": "проверяет дневные и месячные лимиты отправителя"},
+        {"atom": "c", "status": "есть", "quote": "лимиты отправителя, а также его наличие в списке заблокированных"},
+        {"atom": "d", "status": "есть", "quote": "По результатам двух проверок формируется итоговый статус перевода"}
+      ]
+    },
+    {
+      "id": "K1-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "три Spring Boot-сервиса взаимодействуют через Kafka … HTTP-, gRPC- и иных синхронных вызовов между сервисами в коде не найдено."},
+        {"atom": "b", "status": "есть", "quote": "публикует `NEW` в `transfers`; сервисы лимитов и скрининга независимо возвращают решения"},
+        {"atom": "c", "status": "есть", "quote": "Kafka Streams в `transfer-service` объединяет их по ID в 10-секундном окне и публикует итог в `transfers`"}
+      ]
+    },
+    {
+      "id": "K1-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Корневой `pom.xml` агрегирует все четыре модуля."},
+        {"atom": "b", "status": "есть", "quote": "общий формат сообщений вынесен в библиотеку `transfer-common`"},
+        {"atom": "c", "status": "есть", "quote": "`transfer-service` | Сервис | **Есть:** REST `/transfers`, порт 8080 … `limit-service` | Сервис | Нет … `screening-service` | Сервис | Нет"}
+      ]
+    },
+    {
+      "id": "K1-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Java 21"},
+        {"atom": "b", "status": "есть", "quote": "Spring Boot 3.4.1"},
+        {"atom": "c", "status": "есть", "quote": "Spring Kafka, Kafka Streams"},
+        {"atom": "d", "status": "есть", "quote": "Spring Data JPA/Hibernate, PostgreSQL JDBC, Liquibase"}
+      ]
+    },
+    {
+      "id": "K1-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "`transfers` | `transfer-service`: `TransferController.publishNew()` … `limit-service`, группа `limit`; `screening-service`, группа `screening`; `transfer-service`, группа `transfer-tracker`"},
+        {"atom": "b", "status": "есть", "quote": "`limit-results` | `limit-service` … `screening-results` | `screening-service` … `transfer-service`: Kafka Streams … `TransferEventListener.onEvent()`, группа `transfer-tracker`"}
+      ]
+    },
+    {
+      "id": "K1-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Образ `confluentinc/cp-kafka:7.6.0`"},
+        {"atom": "b", "status": "есть", "quote": "Образ `postgres:16-alpine` | Три отдельных контейнера и БД … каждый имеет собственную PostgreSQL-БД"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K1-S1", "status": "есть", "quote": "`transfers.DLT` во всех сервисах, а также `limit-results.DLT` и `screening-results.DLT` в `transfer-service`"},
+    {"id": "K1-S2", "status": "есть", "quote": "Kafka Streams `DecisionTopologyConfig.decisionStream()` — группа явно не задана"},
+    {"id": "K1-S3", "status": "нет", "quote": ""},
+    {"id": "K1-S4", "status": "нет", "quote": ""},
+    {"id": "K1-S5", "status": "нет", "quote": ""},
+    {"id": "K1-S6", "status": "есть", "quote": "один broker/controller в режиме KRaft … внутренний адрес `broker:29092` … `transferdb` (`transfer-db`, порт хоста 5434), `limitdb` (`limit-db`, 5432), `screeningdb` (`screening-db`, 5433)"}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {
+      "quote": "Maven 3.9.9",
+      "code_ref": "Dockerfile: стадии poms и build — FROM maven:3.9.9-eclipse-temurin-21",
+      "explanation": "Версия Maven определяется по образу сборки; в эталоне (раздел 1, стек) версия Maven не указана."
+    },
+    {
+      "quote": "Все Maven-модули имеют версию `1.0-SNAPSHOT`.",
+      "code_ref": "pom.xml, transfer-common/pom.xml, transfer-service/pom.xml, limit-service/pom.xml, screening-service/pom.xml; docker-compose.yml (теги образов :1.0-SNAPSHOT)",
+      "explanation": "Во всех пяти pom.xml задана версия 1.0-SNAPSHOT, сервисы зависят от transfer-common:1.0-SNAPSHOT; в эталоне версия модулей не отражена."
+    },
+    {
+      "quote": "Сборка выбранного модуля вместе с `transfer-common`.",
+      "code_ref": "Dockerfile, стадия build: mvn -B -q -pl ${MODULE} -am ...; COPY transfer-common/src transfer-common/src",
+      "explanation": "Флаг -am собирает модуль вместе с его зависимостью transfer-common; эталон упоминает только многостадийный Dockerfile с ARG MODULE."
+    }
+  ],
+  "contamination": [],
+  "notes": "Утверждений, противоречащих коду, не найдено: назначение, стек, модули, зависимости сборки, топики с группами, DLT, образы и порты сверены с code.txt. K1-M2(b): слова «параллельно» в ответе нет; атом засчитан по явному «сервисы лимитов и скрининга независимо возвращают решения» после публикации одного события NEW (в разделе 5 оба сервиса читают `transfers` своими группами `limit` и `screening`). K1-S2: имя группы `transfer-service` модель не вывела, а написала «группа явно не задана»; засчитано по сноске ¹ раздела 1 эталона (формулировку «явно не задан» тоже засчитывать). K1-S6: ядро закрыто (KRaft, порты хоста БД, внутренний адрес брокера); healthcheck, тома и `ARG MODULE` не названы. K1-S3 (автосоздание выключено, топики объявляет каждый сервис, compact), K1-S4 (record без зависимостей и без родителя Spring Boot) и K1-S5 (201 со статусом NEW, итог асинхронно через GET) в ответе отсутствуют. Ссылки на файлы и методы в разделе «Назначение» нарушением не считаются: промпт требует указывать файл и класс/метод. Упоминание «внешней платёжной системы» — корректное отрицание, а не маркер контаминации. Расхождений эталона с кодом по разделам 1, 5, 8 не выявлено."
+}

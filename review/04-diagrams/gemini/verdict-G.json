@@ -1,0 +1,92 @@
+
+{
+  "case": "04",
+  "answer_id": "G",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "три Spring Boot-сервиса… transfer-service… limit-service… screening-service"},
+        {"atom": "b", "status": "есть", "quote": "TDB[(\"transfer-db… LDB[(\"limit-db… SDB[(\"screening-db"},
+        {"atom": "c", "status": "есть", "quote": "topic: transfers… topic: limit-results… topic: screening-results"},
+        {"atom": "d", "status": "есть", "quote": "HTTP/REST… JDBC… Kafka producer… Kafka consumer"},
+        {"atom": "e", "status": "есть", "quote": "TC -->|\"Kafka producer: topic transfers\"| T… T -->|\"Kafka consumer, groupId=limit\"| LEL"}
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "INSERT transfers (status=NEW)… send(\"transfers\", id, Transfer[status=NEW])… 201 Created"},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "есть", "quote": "stream join limit-results + screening-results"},
+        {"atom": "d", "status": "есть", "quote": "TE: onEvent(Transfer[COMPLETED])… L: onEvent(Transfer[COMPLETED])"}
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "limit-service… usage.dailyUsed + amount > dailyMax → reservations.decline… screening-service… Transfer[APPROVED]"},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "TRANSFERS… TRANSFER_HISTORY… SENDER_USAGE… RESERVATIONS… BLOCKED_SENDERS… SCREENING_CHECKS"},
+        {"atom": "b", "status": "есть", "quote": "fk: transfer_history.transfer_id → transfers.id"},
+        {"atom": "c", "status": "есть", "quote": "TRANSFER_MESSAGE… long id… long senderId"},
+        {"atom": "d", "status": "есть", "quote": "логически: reservations.sender_id (без FK)… Логические связи между сущностями разных диаграмм (без внешних ключей"}
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "[*] --> NEW : POST /transfers"},
+        {"atom": "b", "status": "есть", "quote": "APPROVED --> COMPLETED… APPROVED --> CANCELLED… APPROVED + DECLINED… DECLINED --> DENIED… DECLINED + DECLINED"},
+        {"atom": "c", "status": "есть", "quote": "COMPLETED --> [*]… CANCELLED --> [*]… DENIED --> [*]"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K4-S1", "status": "нет", "quote": ""},
+    {"id": "K4-S2", "status": "есть", "quote": "NONE (declined) → финал; RESERVED → COMMITTED (при COMPLETED) или RESERVED → RELEASED"},
+    {"id": "K4-S3", "status": "нет", "quote": ""},
+    {"id": "K4-S4", "status": "нет", "quote": ""},
+    {"id": "K4-S5", "status": "есть", "quote": "decimal_15_2 amount… varchar_20 stage \"UNIQUE (transfer_id, stage)\"… bigint sender_id \"UNIQUE\""},
+    {"id": "K4-S6", "status": "нет", "quote": ""},
+    {"id": "K4-S7", "status": "нет", "quote": ""}
+  ],
+  "errors": [
+    {
+      "quote": "LIMIT_LEDGER.settle(): CASE \"CANCELLED\" → usage.release(amount, ...) reservation.markReleased() (компенсация резерва)",
+      "category": "искажение",
+      "etalon_ref": "L11, L13",
+      "code_ref": "LimitLedger.settle",
+      "explanation": "При отказе limit-service резерв находится в статусе NONE (не создан), поэтому settle() досрочно завершается, и компенсация (возврат лимита) не выполняется."
+    },
+    {
+      "quote": "TRANSFERS ||--|| TRANSFER_HISTORY",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "4.1, 9.4",
+      "code_ref": "TransferHistoryEntry",
+      "explanation": "У одного перевода от 1 до 4 записей истории, поэтому кардинальность должна быть 1 ко многим (||--|{), а не 1 к 1."
+    },
+    {
+      "quote": "SENDER_USAGE ||--o{ RESERVATIONS",
+      "category": "неточность",
+      "etalon_ref": "9.4",
+      "code_ref": "LimitLedger.decide",
+      "explanation": "При INVALID_AMOUNT таблица sender_usage не обновляется, поэтому связь со стороны отправителя должна быть 0..1, а не строго 1."
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "Сценарий частичного отказа... при недоступности Kafka... клиент получает 503... а повторный запрос с тем же id просто переиздаёт событие... двойной записи не возникает",
+      "code_ref": "TransferController.publishNew, TransferController.duplicate",
+      "explanation": "Модель верно описала поведение при недоступности Kafka и последующем повторном запросе."
+    }
+  ],
+  "contamination": [],
+  "notes": "Модель противоречит сама себе: в диаграмме состояний (Диаграмма 5) верно указано «DECLINED --> CANCELLED... нет резерва», а в sequence-диаграмме для того же сценария нарисован возврат резерва. Зачтено искажение по sequence-диаграмме."
+}

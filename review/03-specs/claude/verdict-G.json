@@ -1,0 +1,86 @@
+{
+  "case": "03",
+  "answer_id": "G",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Эндпоинт: POST /transfers … Эндпоинт: GET /transfers … Эндпоинт: GET /transfers/{id}"},
+        {"atom": "b", "status": "есть", "quote": "201 | Создан новый перевод … 200 | Перевод с тем же `id` … 400 | Тело запроса не десериализовано … 409 | Перевод с таким `id` уже существует … 503 | Не удалось опубликовать сообщение в Kafka"},
+        {"atom": "c", "status": "есть", "quote": "200 | Перевод найден; возвращаются `transfer` и `history`. … 404 | Перевод с указанным `id` не найден; тело ответа отсутствует."},
+        {"atom": "d", "status": "есть", "quote": "id | body | integer (int64) | да (`@NotNull`) … amount | number | нет | Сумма перевода. … transfer | object | нет | Данные перевода."}
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "sender_usage (база: limitdb) … reservations (база: limitdb) … blocked_senders (база: screeningdb) … screening_checks (база: screeningdb) … transfers (база: transferdb) … transfer_history"},
+        {"atom": "b", "status": "есть", "quote": "daily_used | DECIMAL(15,2) … amount | DECIMAL(15,2) | нет | нет | нет | да | нет | нет | нет | Сумма перевода."},
+        {"atom": "c", "status": "есть", "quote": "Таблица: reservations (база: limitdb) … transfer_id | BIGINT | да | нет | да (PK) … Таблица: screening_checks (база: screeningdb) … transfer_id | BIGINT | да | нет | да (PK)"},
+        {"atom": "d", "status": "есть", "quote": "transfer_id | BIGINT | нет | transfers(id)"},
+        {"atom": "e", "status": "есть", "quote": "uq_transfer_history_stage — UNIQUE | transfer_id, stage"},
+        {"atom": "f", "status": "есть", "quote": "sender_id | BIGINT | нет | нет | да | да | нет | idx_blocked_senders_sender_id; также индекс UNIQUE"}
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "id | Long … senderId | Long … recipientId | Long … amount | BigDecimal … currency | String … status | String … decidedBy | String … messageInfo | String … createdAt | LocalDateTime"},
+        {"atom": "b", "status": "есть", "quote": "status | String | нет | `NEW`, `APPROVED`, `DECLINED`, `COMPLETED`, `CANCELLED` или `DENIED`."}
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Канал: transfers … Канал: limit-results … Канал: screening-results … Число партиций | 3 … Политика хранения / очистки | `cleanup.policy=compact`"},
+        {"atom": "b", "status": "есть", "quote": "Ключ сообщения | `Long` — идентификатор перевода `Transfer.id` … Сериализация значения | JSON: `JsonSerializer`"},
+        {"atom": "c", "status": "есть", "quote": "TransferController.publishNew … DecisionTopologyConfig.decisionStream … группа `limit` … группа `screening` … группа `transfer-tracker` … LimitService.sendAndWait … ScreeningService.sendAndWait"}
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Ответ 500 для `POST /transfers`, `GET /transfers`, `GET /transfers/{id}` | Не описан"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K3-S1", "status": "есть", "quote": "version | BIGINT | нет | нет | нет | да | 0 | нет | Версия записи."},
+    {"id": "K3-S2", "status": "нет", "quote": ""},
+    {"id": "K3-S3", "status": "есть", "quote": "Канал: transfers.DLT … Отправители | `limit-service`, `screening-service`, `transfer-service` … Канал: limit-results.DLT … Отправители | `transfer-service`"},
+    {"id": "K3-S4", "status": "есть", "quote": "Значения status | `NEW`, `COMPLETED`, `CANCELLED`, `DENIED` … Значения status | `APPROVED`, `DECLINED` … status | String"},
+    {"id": "K3-S5", "status": "есть", "quote": "state | `RESERVED`, `COMMITTED`, `RELEASED`, `NONE`"},
+    {"id": "K3-S6", "status": "есть", "quote": "группа определяется `application.id`, значение в коде не найдено"},
+    {"id": "K3-S7", "status": "есть", "quote": "Ответ 400 для `GET /transfers/{id}` | Не описан … `Transfer.updatedAt` | Указан `type: string`; `nullable: true` отсутствует"},
+    {"id": "K3-S8", "status": "нет", "quote": ""},
+    {"id": "K3-S9", "status": "нет", "quote": ""}
+  ],
+  "errors": [
+    {
+      "quote": "createdAt | LocalDateTime | нет | Дата и время создания перевода. | `\"2026-01-15T10:15:30\"`",
+      "category": "неточность",
+      "etalon_ref": "4.4; раздел 8, «Частые искажения» (createdAt в Kafka — ISO-строка)",
+      "code_ref": "application.yml всех сервисов (spring.kafka.producer.value-serializer: JsonSerializer по имени класса); transfer-service application.yml (default.value.serde: JsonSerde); DecisionTopologyConfig.decisionStream (new JsonSerde<>(Transfer.class)); Transfer.createdAt (LocalDateTime)",
+      "explanation": "Сериализаторы Kafka заданы по имени класса или созданы через new. Они используют собственный ObjectMapper spring-kafka, а не настроенный Spring Boot, поэтому LocalDateTime пишется массивом [год, месяц, день, час, мин, сек, нано] из 5–7 элементов (эталон 4.4, проверено запуском). ISO-строка бывает только в REST-ответах transfer-service."
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "Сериализация ключа | `DelegatingByTypeSerializer`: `LongSerializer` или `ByteArraySerializer`",
+      "code_ref": "KafkaErrorHandlingConfig.kafkaErrorHandler и KafkaErrorHandlingConfig.keySerializer (transfer-service, limit-service, screening-service)",
+      "explanation": "DLT публикуется через два KafkaTemplate, которые выбираются по типу значения: byte[] → ByteArraySerializer, прочие объекты → JsonSerializer. Ключ сериализует DelegatingByTypeSerializer: byte[] → ByteArraySerializer, Long → LongSerializer. В эталоне это описано лишь косвенно (F-4)."
+    },
+    {
+      "quote": "Базовая структура ProblemDetail … status | integer | нет | HTTP-код ответа.",
+      "code_ref": "ApiExceptionHandler.handleUnexpected и TransferController.duplicate (ProblemDetail.forStatusAndDetail); transfer-service application.yml (spring.mvc.problemdetails.enabled: true); transfer-api.yaml components/schemas/Problem",
+      "explanation": "Ошибки отдаются как ProblemDetail с полями type, title, status, detail, instance; набор полей совпадает со схемой Problem в контракте. В эталоне указан только media type application/problem+json."
+    },
+    {
+      "quote": "reason | `NULL`, `INVALID_AMOUNT`, `DAILY_LIMIT_EXCEEDED`, `MONTHLY_LIMIT_EXCEEDED` … reason | `NULL`, `SENDER_BLOCKED`",
+      "code_ref": "LimitLedger.decide (decline с INVALID_AMOUNT, DAILY_LIMIT_EXCEEDED, MONTHLY_LIMIT_EXCEEDED); Reservation.approve (reason = null); ScreeningJournal.check (SENDER_BLOCKED или null)",
+      "explanation": "Это допустимые значения колонок reservations.reason и screening_checks.reason. В разделах 4.2–4.3 эталона они не перечислены, есть только в 4.4 для messageInfo."
+    }
+  ],
+  "contamination": [],
+  "notes": "Найдена одна ошибка: пример createdAt в Kafka записан ISO-строкой (эталон 4.4: неточность), поэтому K3-S9 не засчитан. K3-M3(b) закрыт общим перечнем значений status в таблице сообщения Transfer. K3-S4 закрыт отдельной находкой: строками «Значения status» по каналам (transfers: NEW и финальные; limit-results/screening-results: APPROVED, DECLINED) при типе String. NEW и финальные статусы внутри transfers не разделены, пункт засчитан по ядру. K3-M5 закрыт расхождением O1 (500), K3-S7 — расхождениями O2 и O7. K3-S1 засчитан по колонке version в sender_usage («Версия записи»); оптимистическая блокировка явно не названа. K3-S2 не засчитан: «нет» в колонке FK — только заполнение шаблона, логические связи по sender_id не названы. K3-S3 засчитан по отправителям DLT: transfers.DLT — все три сервиса, *-results.DLT — только transfer-service. Кто объявляет DLT, явно не сказано. K3-S6 засчитан по сноске ¹ эталона: «группа определяется application.id, значение в коде не найдено» равнозначно «явно не задан». Сомнительные места, в errors не записаны: (1) «history … может быть пустым» — TransferTrackingService.createTransfer создаёт перевод и запись истории NEW в одной транзакции, поэтому через API у перевода всегда есть хотя бы одна запись (эталон 4.1: 1–4 записи); на уровне схемы пустой массив не запрещён. (2) title в ProblemDetail помечен nullable — пометка консервативная. Упоминание LocalDateTime в описаниях дат HTTP нарушением формата не считаю: в колонке «Тип» стоит JSON-тип string. Расхождений эталона с кодом не обнаружено."
+}

@@ -29,6 +29,11 @@
       "source": "experiment/01-recon/answer-gemini-4-argon-high.md",
       "model": "gemini-4-argon-high",
       "markers_removed": 0
+    },
+    "G": {
+      "source": "experiment/01-recon/answer-kimi-k3.1-pro-max.md",
+      "model": "kimi-k3.1-pro-max",
+      "markers_removed": 0
     }
   },
   "02": {
@@ -60,6 +65,11 @@
     "F": {
       "source": "experiment/02-business-logic/answer-gemini-4-argon-high.md",
       "model": "gemini-4-argon-high",
+      "markers_removed": 0
+    },
+    "G": {
+      "source": "experiment/02-business-logic/answer-kimi-k3.1-pro-max.md",
+      "model": "kimi-k3.1-pro-max",
       "markers_removed": 0
     }
   },
@@ -93,6 +103,11 @@
       "source": "experiment/03-specs/answer-gemini-4-argon-high.md",
       "model": "gemini-4-argon-high",
       "markers_removed": 0
+    },
+    "G": {
+      "source": "experiment/03-specs/answer-kimi-k3.1-pro-max.md",
+      "model": "kimi-k3.1-pro-max",
+      "markers_removed": 0
     }
   },
   "04": {
@@ -125,6 +140,11 @@
       "source": "experiment/04-diagrams/answer-gemini-4-argon-high.md",
       "model": "gemini-4-argon-high",
       "markers_removed": 0
+    },
+    "G": {
+      "source": "experiment/04-diagrams/answer-kimi-k3.1-pro-max.md",
+      "model": "kimi-k3.1-pro-max",
+      "markers_removed": 0
     }
   },
   "05": {
@@ -156,6 +176,11 @@
     "F": {
       "source": "experiment/05-change-request/answer-gemini-4-argon-high.md",
       "model": "gemini-4-argon-high",
+      "markers_removed": 0
+    },
+    "G": {
+      "source": "experiment/05-change-request/answer-kimi-k3.1-pro-max.md",
+      "model": "kimi-k3.1-pro-max",
       "markers_removed": 0
     }
   }
