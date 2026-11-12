@@ -1,0 +1,64 @@
+{
+  "case": "03",
+  "answer_id": "H",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "1.1 Эндпоинт: POST /transfers… 1.2 Эндпоинт: GET /transfers… 1.3 Эндпоинт: GET /transfers/{id}"},
+        {"atom": "b", "status": "есть", "quote": "Коды ответа:… 201… 200… 400… 409… 503… 500"},
+        {"atom": "c", "status": "есть", "quote": "Коды ответа:… 200… Перевод найден… 404… Перевод с указанным id не найден… 400… 500"},
+        {"atom": "d", "status": "есть", "quote": "Тип… object (`application/json`)… integer (int64)… number… string… array"}
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "База transferdb… 2.1 Таблица: transfers… 2.2 Таблица: transfer_history… База limitdb… 2.3 Таблица: sender_usage… 2.4 Таблица: reservations… База screeningdb… 2.5 Таблица: blocked_senders… 2.6 Таблица: screening_checks"},
+        {"atom": "b", "status": "есть", "quote": "DECIMAL(15,2)"},
+        {"atom": "c", "status": "есть", "quote": "reservations… transfer_id | BIGINT | да | нет | да (PK)… screening_checks… transfer_id | BIGINT | да | нет | да (PK)"},
+        {"atom": "d", "status": "есть", "quote": "transfer_history… transfer_id | BIGINT | нет | transfers(id)"},
+        {"atom": "e", "status": "есть", "quote": "uq_transfer_history_stage (UNIQUE) | transfer_id, stage"},
+        {"atom": "f", "status": "есть", "quote": "blocked_senders… sender_id | BIGINT | нет | нет | да | да… уникальный индекс ограничения UNIQUE"}
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "id | Long… senderId | Long… recipientId | Long… amount | BigDecimal… currency | String… status | String… decidedBy | String… messageInfo | String… createdAt | LocalDateTime"},
+        {"atom": "b", "status": "есть", "quote": "Значения полей по каналам:… transfers… NEW… limit-results… APPROVED, DECLINED… screening-results… APPROVED, DECLINED… transfers — Kafka Streams… COMPLETED, CANCELLED, DENIED"}
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "3.2 Канал: transfers… Тип канала | Kafka-топик… Число партиций | 3… cleanup.policy=compact… 3.3 Канал: limit-results… 3.4 Канал: screening-results"},
+        {"atom": "b", "status": "есть", "quote": "Ключ сообщения | `Transfer.id` (Long) — идентификатор перевода… Сериализация значения | JSON: `JsonSerializer`"},
+        {"atom": "c", "status": "есть", "quote": "Отправители | 1) transfer-service: `TransferController.publishNew`… Получатели (группа потребителей) | 1) limit-service… группа `limit`; 2) screening-service… группа `screening`"}
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "4. РАСХОЖДЕНИЯ КОНТРАКТА API С КОДОМ"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K3-S1", "status": "есть", "quote": "version | BIGINT… Версия строки для оптимистической блокировки (`@Version`)"},
+    {"id": "K3-S2", "status": "есть", "quote": "reservations… sender_id | BIGINT | нет | нет… screening_checks… sender_id | BIGINT | нет | нет"},
+    {"id": "K3-S3", "status": "есть", "quote": "3.5 Канал: transfers.DLT… Объявление | `KafkaErrorHandlingConfig.transfersDlt` в transfer-service, limit-service, screening-service… 3.6 Канал: limit-results.DLT… (только transfer-service)"},
+    {"id": "K3-S4", "status": "есть", "quote": "Значения полей по каналам:… transfers… NEW… limit-results… APPROVED, DECLINED… screening-results… APPROVED, DECLINED… transfers — Kafka Streams… COMPLETED, CANCELLED, DENIED"},
+    {"id": "K3-S5", "status": "есть", "quote": "state | VARCHAR(20)… RESERVED, COMMITTED, RELEASED, NONE (`Reservation.STATE_RESERVED`, `STATE_COMMITTED`, `STATE_RELEASED`, `STATE_NONE`)"},
+    {"id": "K3-S6", "status": "есть", "quote": "группа = `application.id` `transfer-service` (`spring.kafka.streams.application-id` не задан, используется `spring.application.name`)"},
+    {"id": "K3-S7", "status": "есть", "quote": "GET /transfers/{id}: код ответа 400 | Не описан… TransferRequest.currency = null | `nullable` не указан… TransferRequest.amount: число знаков после запятой | `multipleOf: 0.01`… отклоняется с кодом 400"},
+    {"id": "K3-S8", "status": "есть", "quote": "Заголовки | `__TypeId__` = `com.example.common.Transfer` (добавляется `JsonSerializer` по умолчанию)"},
+    {"id": "K3-S9", "status": "есть", "quote": "ObjectMapper Spring Kafka по умолчанию… сериализует его как массив чисел [год, месяц, день, час, минута, секунда, наносекунды]"}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {"quote": "3.8 Канал: служебные топики Kafka Streams (transfer-service)... Внутренние changelog-топики оконных хранилищ join", "code_ref": "transfer-service DecisionTopologyConfig", "explanation": "Описаны внутренние топики Kafka Streams, не требуемые промптом, но технически корректные."}
+  ],
+  "contamination": [],
+  "notes": "Идеально точный, подробный ответ. Строго соблюдены требования к типам по протоколам."
+}

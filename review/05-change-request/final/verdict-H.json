@@ -1,0 +1,98 @@
+{
+  "case": "05",
+  "answer_id": "H",
+  "mandatory": [
+    {
+      "id": "K5-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "А. В limit-service — при принятии решения по событию `NEW`, вместе с дневным и месячным лимитами."},
+        {"atom": "b", "status": "есть", "quote": "решение `DECLINED`, причина `SINGLE_TRANSFER_LIMIT_EXCEEDED` … `SINGLE_TRANSFER_LIMIT_EXCEEDED` (30 символов при VARCHAR(50))"},
+        {"atom": "c", "status": "есть", "quote": "При сумме, равной `single_transfer_max`, система должна считать проверку пройденной. Отклоняется только строгое превышение"},
+        {"atom": "d", "status": "есть", "quote": "система должна выполнять проверки в порядке `INVALID_AMOUNT` → `SINGLE_TRANSFER_LIMIT_EXCEEDED` → `DAILY_LIMIT_EXCEEDED` → `MONTHLY_LIMIT_EXCEEDED`"}
+      ]
+    },
+    {
+      "id": "K5-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "limit `DECLINED` (`SINGLE_TRANSFER_LIMIT_EXCEEDED`) + screening `APPROVED` → `status = CANCELLED`, `decidedBy = \"limit\"` … screening `DECLINED` → `status = DENIED`"},
+        {"atom": "b", "status": "есть", "quote": "При отклонении по правилу 1 система не должна изменять `daily_used` и `monthly_used` отправителя."},
+        {"atom": "c", "status": "есть", "quote": "Она должна сохранить в `reservations` запись с `decision = DECLINED`, `reason = SINGLE_TRANSFER_LIMIT_EXCEEDED`, `state = NONE`"}
+      ]
+    },
+    {
+      "id": "K5-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Новая таблица `limit_settings` — общие лимиты для всех отправителей … во всех экземплярах limit-service и без их перезапуска"},
+        {"atom": "b", "status": "есть", "quote": "`daily_max = 50000.00`, `monthly_max = 200000.00` … `single_transfer_max = 50000.00` … Значение `single_transfer_max` временное, до ответа на вопрос 8.1"},
+        {"atom": "c", "status": "есть", "quote": "параметры `limits.daily-max` и `limits.monthly-max` удаляются из `limit-service/src/main/resources/application.yml`: значения берутся только из `limit_settings`"}
+      ]
+    },
+    {
+      "id": "K5-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "А. В limit-service. … Плюсы: сервис владеет и данными, и логикой лимитов. API и проверка работают с одной таблицей, дублирования нет."},
+        {"atom": "b", "status": "есть", "quote": "limit-service работает только через Kafka, HTTP-слоя у него нет: в `limit-service/pom.xml` нет web-зависимостей, в `docker-compose.yml` порт limit-service не опубликован."},
+        {"atom": "c", "status": "есть", "quote": "Эндпоинт: `GET /limits` … Описание: возвращает текущие значения всех лимитов … Эндпоинт: `PUT /limits` … Описание: заменяет значения всех трёх лимитов"},
+        {"atom": "d", "status": "есть", "quote": "400 | Тело не читается как JSON или значение не число; любое поле отсутствует или равно null; значение меньше или равно 0 … 409 | `version` не совпадает с текущей"}
+      ]
+    },
+    {
+      "id": "K5-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfer-service (код, БД, REST API `/transfers`) | без изменений … screening-service | без изменений … transfer-common (`Transfer`) | без изменений"},
+        {"atom": "b", "status": "есть", "quote": "При повторном событии `NEW` по переводу, решение по которому уже принято, система должна вернуть сохранённое решение, даже если лимиты с тех пор изменились."}
+      ]
+    },
+    {
+      "id": "K5-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Перевод 10000.00 (равен порогу) → `COMPLETED`. … Перевод 10000.01 → `CANCELLED`, `decidedBy = limit`, `messageInfo = SINGLE_TRANSFER_LIMIT_EXCEEDED`."},
+        {"atom": "b", "status": "есть", "quote": "Отправитель за текущие сутки уже перевёл 45000.00 … перевод 10000.01 → `CANCELLED` с `SINGLE_TRANSFER_LIMIT_EXCEEDED`, а не с `DAILY_LIMIT_EXCEEDED`."},
+        {"atom": "c", "status": "есть", "quote": "затем `PUT /limits` с `singleTransferMax = 20000.00` → 200; новый перевод 15000.00 → `COMPLETED`. limit-service при этом не перезапускался."},
+        {"atom": "d", "status": "есть", "quote": "`PUT /limits` без одного из полей (проверяется для каждого поля, включая `version`) → 400 … Значение лимита 0 → 400; -100.00 → 400"}
+      ]
+    },
+    {
+      "id": "K5-M7",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Начальное значение максимальной суммы одного перевода. В задаче оно не задано, а без него нельзя подготовить миграцию."},
+        {"atom": "b", "status": "есть", "quote": "Валюта лимитов. В какой валюте заданы лимиты и что делать с переводами в других валютах"},
+        {"atom": "c", "status": "есть", "quote": "Доступ к API. Кто может просматривать лимиты, а кто — изменять? Нужны ли аутентификация и разграничение прав"},
+        {"atom": "d", "status": "есть", "quote": "Аудит изменений. Нужна ли история изменений лимитов (кто, когда, старое и новое значение) и её просмотр через API?"},
+        {"atom": "e", "status": "нет", "quote": ""}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K5-S1", "status": "есть", "quote": "Б. В transfer-service; настройки хранятся в transferdb и доставляются в limit-service через новый компактный топик … Г. transfer-service читает и пишет limitdb напрямую."},
+    {"id": "K5-S2", "status": "есть", "quote": "А. Оставить в `application.yml`, а через API менять значения в памяти процесса. … При нескольких экземплярах limit-service значения расходятся … источник один для всех экземпляров"},
+    {"id": "K5-S3", "status": "есть", "quote": "Б. В transfer-service — синхронной проверкой при `POST /transfers` (ответ 400). … Перевод не создаётся, поэтому не остаётся ни истории, ни следа попытки."},
+    {"id": "K5-S4", "status": "есть", "quote": "пока оно равно дневному лимиту, поведение системы не меняется … 50000.00 — столько же, сколько дневной лимит, поэтому поведение не изменится, пока порог не установят через API"},
+    {"id": "K5-S5", "status": "есть", "quote": "Новый API меняет финансовые лимиты сразу для всех отправителей. Без защиты изменить их сможет любой, у кого есть сетевой доступ к порту limit-service."},
+    {"id": "K5-S6", "status": "есть", "quote": "придётся перезапустить limit-service с миграцией БД. Выкатывать нужно в окно без трафика … Ошибка чтения настроек (недоступна БД, нет записи — правило 7) приводит к тому же сценарию"},
+    {"id": "K5-S7", "status": "нет", "quote": ""},
+    {"id": "K5-S8", "status": "есть", "quote": "Соотношение лимитов. Запрещать ли значения, при которых `singleTransferMax > dailyMax` или `dailyMax > monthlyMax`?"},
+    {"id": "K5-S9", "status": "есть", "quote": "Новый порог унаследует ту же проблему: у максимальной суммы одного перевода нет валюты, и перевод на 10000.00 USD пройдёт при пороге 10000.00."},
+    {"id": "K5-S10", "status": "есть", "quote": "Заблокированный отправитель (`senderId = 5`), перевод 10000.01 → `DENIED` … `singleTransferMax` увеличен до 20000.00 … → в `limit-results` публикуется прежнее решение"}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {
+      "quote": "Его порт должен отличаться от порта transfer-service (8080) и в `docker-compose.yml`, и при локальном запуске: конфигурация обоих сервисов рассчитана на запуск на одном хосте",
+      "code_ref": "limit-service/src/main/resources/application.yml, transfer-service/src/main/resources/application.yml (datasource на localhost, server.port нигде не задан); docker-compose.yml (transfer-service 8080:8080)",
+      "explanation": "HTTP-порт явно не задан ни в одном сервисе, значит используется 8080 по умолчанию. Профиль по умолчанию рассчитан на localhost. Если добавить веб-слой в limit-service без явного порта, при локальном запуске он займёт тот же порт, что и transfer-service."
+    },
+    {
+      "quote": "в `openapi/transfer-api.yaml` поле `messageInfo` — свободная строка без перечня значений, поэтому схема API `/transfers` не меняется",
+      "code_ref": "transfer-service/src/main/resources/openapi/transfer-api.yaml (схемы Transfer и HistoryEntry: messageInfo type string, nullable, без enum)",
+      "explanation": "Новая причина отклонения не требует менять контракт REST API переводов."
+    },
+    {
+      "quote": "Тестовых данных в limit-service нет (`changelog-master.yaml` подключает только `001-create-tables.sql`)",
+      "code_ref": "limit-service/src/main/resources/db/changelog/changelog-master.yaml",
+      "explanation": "Цепочка миграций limit-service только создаёт таблицы. Тестовые данные есть лишь у screening-service (002-insert-test-data.sql)."
+    }
+  ],
+  "contamination": [],
+  "notes": "K5-M7: атомы a–e = начальное значение, валюта, права доступа, аудит, снижение ниже израсходованного. Атом e как открытый вопрос не поставлен: сценарий решён правилом 15 (раздел 5.1) и тестом 12, а смежный вопрос 8.8 («когда изменения вступают в силу») его прямо не называет. Группа закрыта 4 из 5. K5-S7 не засчитан: матрица CANCELLED/DENIED и составная причина «SINGLE_TRANSFER_LIMIT_EXCEEDED; SENDER_BLOCKED» приведены и зачтены в K5-M2(a), но расхождение бизнес-термина «отклонять» и статуса CANCELLED явно не отмечено. K5-S1 засчитан по ядру: варианты limit-service, transfer-service с топиком, прокси и общая БД; варианта с отдельным сервисом нет. K5-S4 засчитан по утверждениям, что при пороге, равном дневному лимиту, поведение не меняется. Оговорка: при предложенном порядке проверок перевод больше 50 000 отклонялся бы с SINGLE_TRANSFER_LIMIT_EXCEEDED вместо DAILY_LIMIT_EXCEEDED, то есть решение то же, а причина другая; в errors не внесено. Пограничный штраф «решение в схеме принято раньше открытого вопроса»: NOT NULL и CHECK (> 0) в limit_settings, ответ 400 при значении ≤ 0 и тест 19 при открытом вопросе 8.5. В errors не внесено: ответ явно вводит правило «разработка идёт по предложению по умолчанию», предложение 8.5 совпадает со схемой, а CHECK соотношения лимитов прямо обусловлен вопросом 8.4. Утверждение «текст с суммами не помещается в reservations.reason» категорично: короткий текст в VARCHAR(50) поместится. Это мелочь, в errors не внесено. Предписаний классов и методов нет: ссылки на LimitLedger, ApiExceptionHandler и др. даны в скобках как обоснование, а удаление ключей limits.* из application.yml и имя файла OpenAPI относятся к конфигурации и контракту. Расхождений эталона с кодом не выявлено, маркеров контаминации нет."
+}

@@ -1,0 +1,73 @@
+{
+  "case": "03",
+  "answer_id": "H",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "1.1 Эндпоинт: POST /transfers … 1.2 Эндпоинт: GET /transfers … 1.3 Эндпоинт: GET /transfers/{id}"},
+        {"atom": "b", "status": "есть", "quote": "| 201 | Перевода с указанным `id` не было … | 200 | Перевод с указанным `id` уже существует … | 400 | … | 409 | Перевод с указанным `id` уже существует с другими … | 503 | Ошибка или таймаут"},
+        {"atom": "c", "status": "есть", "quote": "| 200 | Перевод найден | … | 404 | Перевод с указанным `id` не найден |"},
+        {"atom": "d", "status": "есть", "quote": "| id | body | integer (int64) | да | … | amount | body | number | да | … | transfer | object | нет | … | history | array | нет |"}
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "2.1 Таблица: transfers (база: transferdb) … 2.3 Таблица: sender_usage (база: limitdb) … 2.6 Таблица: screening_checks (база: screeningdb)"},
+        {"atom": "b", "status": "есть", "quote": "| amount | DECIMAL(15,2) | нет | нет | нет | да | — | — | Сумма перевода |"},
+        {"atom": "c", "status": "есть", "quote": "2.4 Таблица: reservations (база: limitdb) … | transfer_id | BIGINT | да | нет | да (PK) | … 2.6 Таблица: screening_checks (база: screeningdb) … | transfer_id | BIGINT | да | нет | да (PK) |"},
+        {"atom": "d", "status": "есть", "quote": "| transfer_id | BIGINT | нет | transfers(id) |"},
+        {"atom": "e", "status": "есть", "quote": "| uq_transfer_history_stage (UNIQUE) | transfer_id, stage |"},
+        {"atom": "f", "status": "есть", "quote": "| sender_id | BIGINT | нет | нет | да | да | — | idx_blocked_senders_sender_id; уникальный индекс ограничения UNIQUE |"}
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "| id | Long | нет | … | senderId | Long | нет | … | amount | BigDecimal | нет | … | status | String | нет | … | messageInfo | String | да | … | createdAt | LocalDateTime | нет |"},
+        {"atom": "b", "status": "есть", "quote": "| transfers — `TransferController.publishNew` | NEW | … | limit-results — `LimitService.sendAndWait` | APPROVED, DECLINED | … | COMPLETED, CANCELLED, DENIED |"}
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "3.2 Канал: transfers … | Число партиций | 3 | … | Политика хранения / очистки | `cleanup.policy=compact` … 3.3 Канал: limit-results … 3.4 Канал: screening-results"},
+        {"atom": "b", "status": "есть", "quote": "| Ключ сообщения | `Transfer.id` (Long) — идентификатор перевода | … | Сериализация значения | JSON: `JsonSerializer`"},
+        {"atom": "c", "status": "есть", "quote": "| Отправители | 1) transfer-service: `TransferController.publishNew` … группа `limit`; 2) screening-service … группа `screening`; 3) transfer-service … группа `transfer-tracker`"}
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "| Код ответа 500 (POST /transfers, GET /transfers, GET /transfers/{id}) | Не описан ни для одной операции |"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K3-S1", "status": "есть", "quote": "| version | BIGINT | нет | нет | нет | да | 0 | — | Версия строки для оптимистической блокировки (`@Version`) |"},
+    {"id": "K3-S2", "status": "нет", "quote": ""},
+    {"id": "K3-S3", "status": "есть", "quote": "`KafkaErrorHandlingConfig.transfersDlt` в transfer-service, limit-service, screening-service … `KafkaErrorHandlingConfig.limitResultsDlt` (только transfer-service) … для группы `transfer-tracker`"},
+    {"id": "K3-S4", "status": "есть", "quote": "| status | String | нет | Статус; набор значений зависит от канала (см. таблицу ниже) | \"NEW\" |"},
+    {"id": "K3-S5", "status": "есть", "quote": "| state | RESERVED, COMMITTED, RELEASED, NONE (`Reservation.STATE_RESERVED`, `STATE_COMMITTED`, `STATE_RELEASED`, `STATE_NONE`) |"},
+    {"id": "K3-S6", "status": "есть", "quote": "группа = `application.id` `transfer-service` (`spring.kafka.streams.application-id` не задан, используется `spring.application.name`)"},
+    {"id": "K3-S7", "status": "есть", "quote": "| GET /transfers/{id}: код ответа 400 | Не описан (только 200 и 404) | … | `TransferRequest.currency` = null | `nullable` не указан, то есть явный null недопустим (OpenAPI 3.0.3) |"},
+    {"id": "K3-S8", "status": "есть", "quote": "| Заголовки | `__TypeId__` = `com.example.common.Transfer` (добавляется `JsonSerializer` по умолчанию; тип по умолчанию для `JsonDeserializer` в конфигурации не задан) |"},
+    {"id": "K3-S9", "status": "есть", "quote": "`ObjectMapper` Spring Kafka по умолчанию (`JacksonUtils.enhancedObjectMapper`, JavaTimeModule) сериализует его как массив чисел [год, месяц, день, час, минута, секунда, наносекунды]"}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {
+      "quote": "| Сериализация ключа | `DelegatingByTypeSerializer`: Long → `LongSerializer`, byte[] → `ByteArraySerializer` (`KafkaErrorHandlingConfig.keySerializer`) |",
+      "code_ref": "KafkaErrorHandlingConfig.keySerializer, KafkaErrorHandlingConfig.kafkaErrorHandler (transfer-service, limit-service, screening-service)",
+      "explanation": "DLT-шаблоны сериализуют ключ через DelegatingByTypeSerializer с делегатами byte[] → ByteArraySerializer и Long → LongSerializer, поэтому при ошибке десериализации ключа в DLT уходят исходные байты ключа; в эталоне сериализатор ключа DLT не описан."
+    },
+    {
+      "quote": "NEW (stage = NEW); APPROVED, DECLINED (stage = LIMIT, SCREENING); COMPLETED, CANCELLED, DENIED (stage = FINAL)",
+      "code_ref": "TransferTrackingService.createTransfer, TransferTrackingService.recordServiceResult, TransferTrackingService.applyFinalStatus",
+      "explanation": "Набор значений transfer_history.status зависит от этапа: NEW пишет createTransfer, APPROVED/DECLINED — recordServiceResult из limit-results/screening-results, COMPLETED/CANCELLED/DENIED — applyFinalStatus; в эталоне значения перечислены без привязки к stage."
+    }
+  ],
+  "contamination": [],
+  "notes": "K3-S2 не засчитан: в колонке FK для таблиц limitdb и screeningdb везде «нет», но нет явного утверждения о логических связях (reservations.sender_id ↔ sender_usage.sender_id, screening_checks.sender_id ↔ blocked_senders.sender_id). K3-M3(b) закрыт таблицей значений status по каналам, K3-S4 — отдельным фактом «status: String, набор значений зависит от канала». K3-M5 закрыт расхождением O1 (500); K3-S7 — O2 и O6, дополнительно есть верное O8. Сомнительные места, не внесённые в errors: (1) GET /transfers/{id}: history «может быть пустой». В коде запись истории NEW создаётся в одной транзакции с переводом (TransferTrackingService.createTransfer), поэтому через API история всегда содержит не меньше одной записи. Формулировку считаю перестраховкой схемы, а не утверждением о поведении. (2) Раздел 3.8: ключ changelog-топиков оконных хранилищ JOIN указан как Long. Физически это составной бинарный ключ окна; это поведение библиотеки Kafka Streams, в коде не видно. (3) Path-параметр id отмечен «да» без аннотаций валидации: обязательность обеспечивает @PathVariable, нарушением правила промпта не считаю. Массив createdAt показан из 7 элементов, переменная длина (5–7) не упомянута — ошибкой не является. Расхождений эталона с кодом по разделам 4, 5, 6 не выявлено."
+}

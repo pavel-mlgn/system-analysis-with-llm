@@ -1,0 +1,90 @@
+{
+  "case": "05",
+  "answer_id": "H",
+  "mandatory": [
+    {
+      "id": "K5-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "При поступлении события NEW с суммой больше single_transfer_max система должна отклонить перевод"},
+        {"atom": "b", "status": "есть", "quote": "решение DECLINED, причина SINGLE_TRANSFER_LIMIT_EXCEEDED… (30 символов при VARCHAR(50))"},
+        {"atom": "c", "status": "есть", "quote": "При сумме, равной single_transfer_max, система должна считать проверку пройденной. Отклоняется только строгое превышение"},
+        {"atom": "d", "status": "есть", "quote": "проверки в порядке INVALID_AMOUNT → SINGLE_TRANSFER_LIMIT_EXCEEDED → DAILY_LIMIT_EXCEEDED → MONTHLY_LIMIT_EXCEEDED"}
+      ]
+    },
+    {
+      "id": "K5-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "limit DECLINED… + screening APPROVED → status = CANCELLED, decidedBy = \"limit\"… limit DECLINED… + screening DECLINED → status = DENIED"},
+        {"atom": "b", "status": "есть", "quote": "система не должна изменять daily_used и monthly_used отправителя"},
+        {"atom": "c", "status": "есть", "quote": "сохранить в reservations запись с decision = DECLINED, reason = SINGLE_TRANSFER_LIMIT_EXCEEDED, state = NONE"}
+      ]
+    },
+    {
+      "id": "K5-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Хранить в таблице БД limit-service (limitdb)… значения сохраняются после перезапуска… изменения действуют без перезапуска"},
+        {"atom": "b", "status": "есть", "quote": "Начальная запись создаётся миграцией… daily_max = 50000.00, monthly_max = 200000.00… single_transfer_max временное, до ответа на вопрос 8.1"},
+        {"atom": "c", "status": "есть", "quote": "Удаляются limits.daily-max и limits.monthly-max из limit-service/src/main/resources/application.yml"}
+      ]
+    },
+    {
+      "id": "K5-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Рекомендуется вариант А… В limit-service… API и проверка работают с одной таблицей… Административный API отделён от клиентского API переводов"},
+        {"atom": "b", "status": "есть", "quote": "limit-service работает только через Kafka, HTTP-слоя у него нет… в docker-compose.yml порт limit-service не опубликован"},
+        {"atom": "c", "status": "есть", "quote": "GET /limits … возвращает текущие значения всех лимитов… PUT /limits … заменяет значения всех трёх лимитов"},
+        {"atom": "d", "status": "есть", "quote": "200 Лимиты изменены… 400 Тело не читается как JSON или значение не число… 409 version не совпадает с текущей"}
+      ]
+    },
+    {
+      "id": "K5-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfer-service (код, БД, REST API /transfers) | без изменений… transfer-common… без изменений… screening-service | без изменений"},
+        {"atom": "b", "status": "есть", "quote": "При повторном событии NEW по переводу, решение по которому уже принято, система должна вернуть сохранённое решение, даже если лимиты с тех пор изменились"}
+      ]
+    },
+    {
+      "id": "K5-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Перевод 10000.00 (равен порогу) → COMPLETED… Перевод 10000.01 → CANCELLED, decidedBy = limit, messageInfo = SINGLE_TRANSFER_LIMIT_EXCEEDED"},
+        {"atom": "b", "status": "есть", "quote": "Отправитель за текущие сутки уже перевёл 45000.00… перевод 10000.01 → CANCELLED с SINGLE_TRANSFER_LIMIT_EXCEEDED, а не с DAILY_LIMIT_EXCEEDED"},
+        {"atom": "c", "status": "есть", "quote": "PUT /limits с singleTransferMax = 20000.00 → 200; новый перевод 15000.00 → COMPLETED. limit-service при этом не перезапускался"},
+        {"atom": "d", "status": "есть", "quote": "PUT /limits без одного из полей… → 400… Значение лимита 0 → 400"}
+      ]
+    },
+    {
+      "id": "K5-M7",
+      "atoms": [
+        {"atom": "начальное значение", "status": "есть", "quote": "Начальное значение максимальной суммы одного перевода. В задаче оно не задано"},
+        {"atom": "валюта", "status": "есть", "quote": "Валюта лимитов. В какой валюте заданы лимиты и что делать с переводами в других валютах"},
+        {"atom": "права доступа", "status": "есть", "quote": "Доступ к API. Кто может просматривать лимиты, а кто — изменять? Нужны ли аутентификация и разграничение прав"},
+        {"atom": "аудит", "status": "есть", "quote": "Аудит изменений. Нужна ли история изменений лимитов (кто, когда, старое и новое значение)"},
+        {"atom": "снижение ниже израсходованного", "status": "нет", "quote": ""}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K5-S1", "status": "есть", "quote": "В каком сервисе разместить REST API… А. В limit-service… Б. В transfer-service… В. В transfer-service как прокси… Рекомендуется вариант А."},
+    {"id": "K5-S2", "status": "есть", "quote": "При нескольких экземплярах limit-service значения расходятся: API изменит только тот экземпляр, который принял запрос."},
+    {"id": "K5-S3", "status": "есть", "quote": "Б. В transfer-service — синхронной проверкой при POST /transfers (ответ 400)… Перевод не создаётся, поэтому не остаётся ни истории, ни следа попытки."},
+    {"id": "K5-S4", "status": "есть", "quote": "Поэтому один перевод на 50000.00, то есть на весь дневной лимит, одобряется."},
+    {"id": "K5-S5", "status": "есть", "quote": "Новый API меняет финансовые лимиты сразу для всех отправителей. Без защиты изменить их сможет любой, у кого есть сетевой доступ к порту"},
+    {"id": "K5-S6", "status": "есть", "quote": "Перезапуск limit-service «подвешивает» переводы… Если результат limit-service публикуется больше чем через 10 секунд… финал не формируется"},
+    {"id": "K5-S7", "status": "есть", "quote": "limit DECLINED (SINGLE_TRANSFER_LIMIT_EXCEEDED) + screening DECLINED → status = DENIED, decidedBy = null, messageInfo = SINGLE_TRANSFER_LIMIT_EXCEEDED; SENDER_BLOCKED"},
+    {"id": "K5-S8", "status": "есть", "quote": "Ограничение на уровне таблицы: CHECK (single_transfer_max <= daily_max AND daily_max <= monthly_max)"},
+    {"id": "K5-S9", "status": "есть", "quote": "Валюта при учёте лимитов игнорируется… Новый порог унаследует ту же проблему: у максимальной суммы одного перевода нет валюты"},
+    {"id": "K5-S10", "status": "есть", "quote": "Заблокированный отправитель (senderId = 5), перевод 10000.01 → DENIED… в топик transfers повторно доставлено то же событие NEW… публикуется прежнее решение"}
+  ],
+  "errors": [
+    {
+      "quote": "CHECK (daily_max > 0) … Ноль и «без ограничения». Нужно ли уметь задать 0 (запрет переводов) или отключить лимит (пустое значение)? Предложение: нет",
+      "category": "неточность",
+      "etalon_ref": "Раздел 10 (Штрафы)",
+      "code_ref": "Ответ модели",
+      "explanation": "Решение в схеме (CHECK > 0) принято до открытого вопроса к бизнесу (можно ли 0)."
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Модель дала отличный и крайне глубокий ответ, который покрыл практически все пункты чек-листа и сильные пункты. Штраф (-0.5) выставлен за формальное нарушение: наличие CHECK ( > 0) в DDL при заданном в этом же документе открытом вопросе к бизнесу, что явно прописано в правилах проверки."
+}

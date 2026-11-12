@@ -1,0 +1,63 @@
+{
+  "case": "04",
+  "answer_id": "H",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfer-service — Spring Boot 3.4.1…limit-service — Spring Boot 3.4.1…screening-service — Spring Boot 3.4.1"},
+        {"atom": "b", "status": "есть", "quote": "transfer-db — PostgreSQL 16…limit-db — PostgreSQL 16…screening-db — PostgreSQL 16"},
+        {"atom": "c", "status": "есть", "quote": "broker — Kafka…transfers — 3 партиции…limit-results — 3 партиции…screening-results — 3 партиции"},
+        {"atom": "d", "status": "есть", "quote": "Сплошные стрелки — синхронные вызовы (HTTP, Java, JDBC), пунктирные — асинхронный обмен через Kafka"},
+        {"atom": "e", "status": "есть", "quote": "Сплошные стрелки — синхронные вызовы (HTTP, Java, JDBC), пунктирные — асинхронный обмен через Kafka"}
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "TransferRepository.saveAndFlush(TransferEntity status=NEW)…publishNew(entity)…201 Created, TransferEntity status=NEW"},
+        {"atom": "b", "status": "есть", "quote": "par limit-service, consumer group limit…and screening-service, consumer group screening"},
+        {"atom": "c", "status": "есть", "quote": "записи limit-results и screening-results с одним ключом id…join, JoinWindows.ofTimeDifferenceWithNoGrace(10 s)"},
+        {"atom": "d", "status": "есть", "quote": "TEL->>TTS: applyFinalStatus(transfer)…LEL->>LS: onFinalStatus(transfer)"}
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "screening-service: отправитель заблокирован…ScreeningCheckRepository.save(result=DECLINED, reason=SENDER_BLOCKED)"},
+        {"atom": "b", "status": "есть", "quote": "limit-service: лимит не превышен, сумма резервируется…reservation.approve(): decision=APPROVED, state=RESERVED"},
+        {"atom": "c", "status": "есть", "quote": "usage.release(amount, reservedOn, LocalDate.now())…reservation.markReleased(): state=RELEASED"}
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transferdb (transfer-service)…limitdb (limit-service)…screeningdb (screening-service)"},
+        {"atom": "b", "status": "есть", "quote": "единственный внешний ключ в системе — transfer_history.transfer_id → transfers.id"},
+        {"atom": "c", "status": "есть", "quote": "Объекты, которые не хранятся в БД (сообщения Kafka и DTO REST API)…Transfer — значение Kafka-сообщения во всех топиках"},
+        {"atom": "d", "status": "есть", "quote": "Сплошная линия — внешний ключ, пунктир — логическая связь по идентификатору без FK"}
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "[*] --> NEW : POST /transfers с валидным TransferRequest и новым id, createTransfer"},
+        {"atom": "b", "status": "есть", "quote": "decide_choice --> COMPLETED : limit APPROVED и screening APPROVED…decide_choice --> DENIED : limit DECLINED и screening DECLINED"},
+        {"atom": "c", "status": "есть", "quote": "COMPLETED --> [*]…CANCELLED --> [*]…DENIED --> [*]"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K4-S1", "status": "есть", "quote": "Если результаты limit и screening разошлись больше чем на 10 с, join не срабатывает и перевод остаётся в NEW"},
+    {"id": "K4-S2", "status": "есть", "quote": "RESERVED → COMMITTED (settle при COMPLETED, markCommitted); RESERVED → RELEASED…NONE, COMMITTED и RELEASED — конечные"},
+    {"id": "K4-S3", "status": "есть", "quote": "screening-service…onEvent, топик transfers, status=CANCELLED…только лог, компенсировать нечего"},
+    {"id": "K4-S4", "status": "есть", "quote": "t_listener -.->|\"Kafka: transfers.DLT, DefaultErrorHandler после 3 повторов через 1 с\"| k_tdlt…t_listener -.->|\"Kafka: limit-results.DLT\"| k_ldlt"},
+    {"id": "K4-S5", "status": "есть", "quote": "DECIMAL(15,2) NOT NULL…NOT NULL UNIQUE, индекс idx_blocked_senders_sender_id"},
+    {"id": "K4-S6", "status": "нет", "quote": ""},
+    {"id": "K4-S7", "status": "есть", "quote": "decide_choice --> CANCELLED : иная комбинация статусов, messageInfo UNEXPECTED_RESULT"}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Модель дала исключительно точный ответ, который соответствует коду и эталону до мелочей. Ошибок не обнаружено."
+}

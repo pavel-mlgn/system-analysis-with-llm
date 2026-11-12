@@ -1,0 +1,69 @@
+{
+  "case": "04",
+  "answer_id": "H",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Компоненты трёх Spring Boot-сервисов (transfer-service, limit-service, screening-service), их базы PostgreSQL, Kafka-брокер с рабочими топиками и DLT"},
+        {"atom": "b", "status": "есть", "quote": "transfer-db — PostgreSQL 16 … limit-db — PostgreSQL 16 … screening-db — PostgreSQL 16"},
+        {"atom": "c", "status": "есть", "quote": "transfers — 3 партиции, compact … limit-results — 3 партиции, compact … screening-results — 3 партиции, compact"},
+        {"atom": "d", "status": "есть", "quote": "HTTP/JSON: POST /transfers, GET /transfers, GET /transfers/{id} … Kafka: transfers, group limit … JDBC: таблица reservations"},
+        {"atom": "e", "status": "есть", "quote": "limit-service — Spring Boot 3.4.1, без HTTP API … screening-service — Spring Boot 3.4.1, без HTTP API … пунктирные — асинхронный обмен через Kafka"}
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "одна транзакция @Transactional, INSERT в transfers и transfer_history … KafkaTemplate.send(transfers, id, Transfer status=NEW).get(10 s) … TC-->>Client: 201 Created"},
+        {"atom": "b", "status": "есть", "quote": "par limit-service, consumer group limit … and screening-service, consumer group screening"},
+        {"atom": "c", "status": "есть", "quote": "Note over DTC: join, JoinWindows.ofTimeDifferenceWithNoGrace(10 s) … DTC->>TDS: decide(limitResult, screeningResult)"},
+        {"atom": "d", "status": "есть", "quote": "K-)TEL: onEvent, топик transfers, status=COMPLETED … TEL->>TTS: applyFinalStatus(transfer) … K-)LEL: onEvent, топик transfers, status=COMPLETED … LS->>LL: settle(transfer)"}
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Отправитель есть в blocked_senders: screening-service отклоняет перевод с причиной SENDER_BLOCKED, когда limit-service уже зарезервировал сумму."},
+        {"atom": "b", "status": "есть", "quote": "Note over LL,LDB: уже выполненное действие: сумма зарезервирована в sender_usage, reservations.state=RESERVED"},
+        {"atom": "c", "status": "есть", "quote": "уже выполненный резерв компенсируется в LimitLedger.settle (RESERVED → RELEASED) … usage.release(amount, reservedOn, LocalDate.now()) … reservation.markReleased(): state=RELEASED"}
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "4а. transferdb (transfer-service) … 4б. limitdb (limit-service) … 4в. screeningdb (screening-service)"},
+        {"atom": "b", "status": "есть", "quote": "единственный внешний ключ в системе — transfer_history.transfer_id → transfers.id"},
+        {"atom": "c", "status": "есть", "quote": "4г. Объекты, которые не хранятся в БД (сообщения Kafka и DTO REST API) … Transfer — значение Kafka-сообщения во всех топиках"},
+        {"atom": "d", "status": "есть", "quote": "Сплошная линия — внешний ключ, пунктир — логическая связь по идентификатору без FK … blocked_senders |o..o{ screening_checks : \"sender_id, логическая связь без FK\""}
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "[*] --> NEW : POST /transfers с валидным TransferRequest и новым id, createTransfer"},
+        {"atom": "b", "status": "есть", "quote": "COMPLETED : limit APPROVED и screening APPROVED … DENIED : limit DECLINED и screening DECLINED … CANCELLED : limit DECLINED и screening APPROVED, decidedBy limit"},
+        {"atom": "c", "status": "есть", "quote": "COMPLETED --> [*] … CANCELLED --> [*] … DENIED --> [*] … Финальные статусы не меняются."}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K4-S1", "status": "есть", "quote": "Если результаты limit и screening разошлись больше чем на 10 с, … join не срабатывает и перевод остаётся в NEW, … пока клиент не повторит POST с тем же id."},
+    {"id": "K4-S2", "status": "есть", "quote": "или NONE (`decline`: INVALID_AMOUNT … RESERVED → COMMITTED (`settle` при COMPLETED, `markCommitted`); RESERVED → RELEASED … NONE, COMMITTED и RELEASED — конечные, `settle` их пропускает"},
+    {"id": "K4-S3", "status": "есть", "quote": "participant TEL as TransferEventListener … Note over SEL: не NEW, только лог: screening holds no reservations"},
+    {"id": "K4-S4", "status": "есть", "quote": "t_listener -.->|\"Kafka: limit-results.DLT\" … t_listener -.->|\"Kafka: screening-results.DLT\" … l_listener -.->|\"Kafka: transfers.DLT … s_listener -.->|\"Kafka: transfers.DLT"},
+    {"id": "K4-S5", "status": "есть", "quote": "DECIMAL amount \"DECIMAL(15,2) NOT NULL\" … BIGINT sender_id UK \"NOT NULL UNIQUE, индекс idx_blocked_senders_sender_id\" … UNIQUE uq_transfer_history_stage вместе с transfer_id"},
+    {"id": "K4-S6", "status": "есть", "quote": "sender_usage |o..|{ reservations : \"sender_id, логическая связь без FK\""},
+    {"id": "K4-S7", "status": "есть", "quote": "decide_choice --> CANCELLED : иная комбинация статусов, messageInfo UNEXPECTED_RESULT"}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {
+      "quote": "ответы POST /transfers и GET /transfers — сериализованный `TransferEntity` (в transfer-api.yaml это схема `Transfer`, не путать с record `com.example.common.Transfer`)",
+      "code_ref": "transfer-service TransferController.create / TransferController.all; transfer-service openapi/transfer-api.yaml components.schemas.Transfer; transfer-common com.example.common.Transfer",
+      "explanation": "POST и GET /transfers возвращают TransferEntity. Схема Transfer в контракте описывает именно его: в ней есть updatedAt, а статус ограничен enum TransferStatus (NEW/COMPLETED/CANCELLED/DENIED). Одноимённый Kafka-record Transfer поля updatedAt не имеет. Эта коллизия имён в эталоне не отмечена."
+    }
+  ],
+  "contamination": [],
+  "notes": "Все группы M и все пункты S закрыты. Утверждений, противоречащих коду, не найдено. Подписи «DefaultErrorHandler после 3 повторов через 1 с» на рёбрах к DLT в диаграмме 1 верны для ошибок обработки (FixedBackOff(1000L, 3L)). Недесериализуемые записи уходят в DLT сразу, без повторов, но о битых сообщениях ответ ничего не утверждает, а в списке логических связей отдельно упомянуты «сырые byte[]». Поэтому в errors не внесено. Формулировки «зарезервировал сумму» и «сумма зарезервирована в sender_usage» относятся к счётчикам лимита, а не к средствам, и неточностью «резервирование денег» не считаются. K4-S2 закрыт текстовым перечнем состояний Reservation после диаграммы 5: промпт разрешает перечислить остальные сущности списком. K4-S6: нотация |o..|{ совпадает с эталоном 9.4; явной привязки 0..1 к INVALID_AMOUNT нет, пункт засчитан по ядру. Мелкие неполноты без штрафа: (1) в 4г перечень значений Transfer.messageInfo не содержит составной причины DENIED «<limit>; <screening>», хотя на диаграмме 5 она упомянута; (2) описание состояния NEW («сохранён … и опубликован») не учитывает случай 503, но его покрывает самопереход NEW → NEW «например после 503»; (3) связь TransferRequest ||..o{ Transfer — пунктирная логическая связь с сообщением, а не связь 1:1 с хранимой сущностью, которую раздел 9.4 считает ошибкой. Расхождений эталона с кодом не выявлено. Синтаксис Mermaid не оценивался."
+}

@@ -1,0 +1,72 @@
+{
+  "case": "01",
+  "answer_id": "H",
+  "mandatory": [
+    {
+      "id": "K1-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Система приёма и автоматической проверки денежных переводов: клиент передаёт заявку на перевод"},
+        {"atom": "b", "status": "есть", "quote": "проходит две проверки — соблюдение дневного и месячного лимитов отправителя (сумма резервируется)"},
+        {"atom": "c", "status": "есть", "quote": "скрининг отправителя по стоп-листу (мошенничество, санкции и т. п.)"},
+        {"atom": "d", "status": "есть", "quote": "по совокупности результатов перевод получает итоговый статус COMPLETED, CANCELLED или DENIED"}
+      ]
+    },
+    {
+      "id": "K1-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "сервисы взаимодействуют между собой только асинхронно через Apache Kafka… Синхронные вызовы между сервисами (HTTP, gRPC и т. п.) в коде не найдены"},
+        {"atom": "b", "status": "есть", "quote": "limit-service и screening-service параллельно проверяют перевод и публикуют свои решения"},
+        {"atom": "c", "status": "есть", "quote": "transfer-service объединяет потоковым join (Kafka Streams, окно 10 с) в итоговый статус"}
+      ]
+    },
+    {
+      "id": "K1-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfer-common… transfer-service… limit-service… screening-service"},
+        {"atom": "b", "status": "есть", "quote": "transfer-common | библиотека | нет"},
+        {"atom": "c", "status": "есть", "quote": "transfer-service | сервис | есть — REST… limit-service | сервис | нет… screening-service | сервис | нет"}
+      ]
+    },
+    {
+      "id": "K1-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Java 21"},
+        {"atom": "b", "status": "есть", "quote": "Spring Boot 3.4.1"},
+        {"atom": "c", "status": "есть", "quote": "Spring for Apache Kafka (spring-kafka), Apache Kafka Streams (kafka-streams, только transfer-service)"},
+        {"atom": "d", "status": "есть", "quote": "PostgreSQL JDBC-драйвер… Liquibase"}
+      ]
+    },
+    {
+      "id": "K1-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfers | transfer-service… | limit-service (группа limit)… screening-service (группа screening)… transfer-service (группа transfer-tracker)"},
+        {"atom": "b", "status": "есть", "quote": "limit-results | limit-service… | transfer-service… screening-results | screening-service… | transfer-service"}
+      ]
+    },
+    {
+      "id": "K1-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Apache Kafka — confluentinc/cp-kafka:7.6.0"},
+        {"atom": "b", "status": "есть", "quote": "PostgreSQL 16 (postgres:16-alpine) — три отдельных экземпляра, по одному на сервис"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K1-S1", "status": "есть", "quote": "transfers.DLT | все три сервиса… limit-results.DLT, screening-results.DLT | transfer-service"},
+    {"id": "K1-S2", "status": "есть", "quote": "в этом случае Spring Boot использует в качестве application.id (он же группа потребителей Kafka Streams) значение spring.application.name = transfer-service"},
+    {"id": "K1-S3", "status": "есть", "quote": "автосоздание топиков отключено… Топики создают сами сервисы при старте… у transfers, limit-results, screening-results — cleanup.policy=compact"},
+    {"id": "K1-S4", "status": "есть", "quote": "transfer-common | библиотека | нет | Общий контракт сообщений Kafka — record Transfer… внешних зависимостей у модуля нет… transfer-common родителя не имеет"},
+    {"id": "K1-S5", "status": "есть", "quote": "сохраняет перевод в статусе NEW, публикует событие в Kafka и отвечает клиенту… клиент узнаёт результат через GET /transfers/{id}"},
+    {"id": "K1-S6", "status": "есть", "quote": "один узел в режиме KRaft… том kafka-data… три контейнера из общего Dockerfile (аргумент MODULE)… стартуют после успешного healthcheck брокера и своей БД"}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {
+      "quote": "Фактическое движение средств по счетам (списание/зачисление) в коде не найдено.",
+      "code_ref": "transfer-service",
+      "explanation": "В системе реализована только проверка и учет лимитов, но нет интеграции с АБС или другим сервисом для реального перевода денег."
+    }
+  ],
+  "contamination": [],
+  "notes": ""
+}

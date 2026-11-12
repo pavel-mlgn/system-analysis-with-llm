@@ -1,0 +1,87 @@
+{
+  "case": "01",
+  "answer_id": "H",
+  "mandatory": [
+    {
+      "id": "K1-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Система приёма и автоматической проверки денежных переводов"},
+        {"atom": "b", "status": "есть", "quote": "соблюдение дневного и месячного лимитов отправителя (сумма резервируется)"},
+        {"atom": "c", "status": "есть", "quote": "скрининг отправителя по стоп-листу (мошенничество, санкции и т. п.)"},
+        {"atom": "d", "status": "есть", "quote": "по совокупности результатов перевод получает итоговый статус `COMPLETED`, `CANCELLED` или `DENIED`"}
+      ]
+    },
+    {
+      "id": "K1-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "сервисы взаимодействуют между собой только асинхронно через Apache Kafka … HTTP-клиентов нет, у `limit-service` и `screening-service` нет веб-зависимостей"},
+        {"atom": "b", "status": "есть", "quote": "`limit-service` и `screening-service` параллельно проверяют перевод и публикуют свои решения"},
+        {"atom": "c", "status": "есть", "quote": "которые `transfer-service` объединяет потоковым join (Kafka Streams, окно 10 с) в итоговый статус"}
+      ]
+    },
+    {
+      "id": "K1-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "`transfer-common` | библиотека … `transfer-service` | сервис … `limit-service` | сервис … `screening-service` | сервис"},
+        {"atom": "b", "status": "есть", "quote": "`transfer-common` | библиотека | нет | Общий контракт сообщений Kafka"},
+        {"atom": "c", "status": "есть", "quote": "Синхронный интерфейс есть только у `transfer-service` для внешних клиентов (REST)."}
+      ]
+    },
+    {
+      "id": "K1-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Java 21"},
+        {"atom": "b", "status": "есть", "quote": "Spring Boot 3.4.1 (`spring-boot-starter-parent`)"},
+        {"atom": "c", "status": "есть", "quote": "Spring for Apache Kafka (`spring-kafka`), Apache Kafka Streams (`kafka-streams`, только `transfer-service`)"},
+        {"atom": "d", "status": "есть", "quote": "Liquibase (`liquibase-core`) … PostgreSQL 16 (`postgres:16-alpine`)"}
+      ]
+    },
+    {
+      "id": "K1-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "`transfers` | `transfer-service`: `TransferController.publishNew` … `limit-service` (группа `limit`) … `screening-service` (группа `screening`) … `transfer-service` (группа `transfer-tracker`)"},
+        {"atom": "b", "status": "есть", "quote": "`limit-results` | `limit-service` … `screening-results` | `screening-service` … (группа `transfer-tracker`) — `TransferEventListener.onEvent`; `transfer-service`, Kafka Streams-join"}
+      ]
+    },
+    {
+      "id": "K1-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "**Apache Kafka** — `confluentinc/cp-kafka:7.6.0`"},
+        {"atom": "b", "status": "есть", "quote": "**PostgreSQL 16** (`postgres:16-alpine`) — три отдельных экземпляра, по одному на сервис"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K1-S1", "status": "есть", "quote": "`transfers.DLT` | все три сервиса: `KafkaErrorHandlingConfig.kafkaErrorHandler` … `limit-results.DLT`, `screening-results.DLT` | `transfer-service`"},
+    {"id": "K1-S2", "status": "есть", "quote": "Spring Boot использует в качестве `application.id` (он же группа потребителей Kafka Streams) значение `spring.application.name` = `transfer-service`"},
+    {"id": "K1-S3", "status": "есть", "quote": "Топики создают сами сервисы при старте … основные топики объявлены одинаково во всех трёх сервисах … `cleanup.policy=compact` … автосоздание топиков отключено"},
+    {"id": "K1-S4", "status": "есть", "quote": "Общий контракт сообщений Kafka — record `Transfer` … внешних зависимостей у модуля нет. … `transfer-common` родителя не имеет."},
+    {"id": "K1-S5", "status": "есть", "quote": "сохраняет перевод в статусе `NEW`, публикует событие в Kafka и отвечает клиенту … клиент узнаёт результат через `GET /transfers/{id}`"},
+    {"id": "K1-S6", "status": "есть", "quote": "один узел в режиме KRaft … с хоста — `localhost:9092` … том `kafka-data` … общего `Dockerfile` (аргумент `MODULE`) … стартуют после успешного healthcheck брокера и своей БД"}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {
+      "quote": "в Docker-сборке — Maven 3.9.9",
+      "code_ref": "Dockerfile: FROM maven:3.9.9-eclipse-temurin-21 AS poms; FROM maven:3.9.9-eclipse-temurin-21 AS build",
+      "explanation": "Версия Maven в сборочных стадиях определена верно; в эталоне упомянуты только многостадийный Dockerfile и JRE 21."
+    },
+    {
+      "quote": "`Dockerfile` собирает каждый сервис командой `mvn -pl ${MODULE} -am`, т. е. вместе с `transfer-common`",
+      "code_ref": "Dockerfile: RUN mvn -B -q -pl ${MODULE} -am -DskipTests package; COPY transfer-common/src transfer-common/src",
+      "explanation": "Флаг -am собирает модули-зависимости из реактора, поэтому transfer-common собирается вместе с сервисом; сборочная связь в Docker-сборке описана верно, в эталоне не отражена."
+    },
+    {
+      "quote": "Кэши, service discovery, API-шлюз, config-сервер, мониторинг и метрики — в коде не найдены.",
+      "code_ref": "docker-compose.yml (только broker, transfer-db, limit-db, screening-db и три приложения); pom.xml модулей (нет actuator, micrometer, spring-cloud, кэшей)",
+      "explanation": "Верное отрицание для раздела инфраструктуры; в эталоне явно есть только отсутствие health-check/actuator (C5)."
+    },
+    {
+      "quote": "`application-docker.yml` переключает адреса Kafka и БД на имена контейнеров",
+      "code_ref": "transfer-service, limit-service, screening-service: application-docker.yml (bootstrap-servers: broker:29092; datasource url на transfer-db / limit-db / screening-db:5432)",
+      "explanation": "Механизм профиля docker описан верно; в эталоне упомянут только сам профиль."
+    }
+  ],
+  "contamination": [],
+  "notes": "Ошибок, противоречащих коду, не найдено. K1-S5 засчитан по смыслу: код 201 явно не назван, но последовательность «сохраняет перевод в статусе NEW … и отвечает клиенту … клиент узнаёт результат через GET /transfers/{id}» однозначно описывает немедленный ответ и асинхронное получение итога. K1-M3(a): число модулей не названо цифрой, но в таблице перечислены ровно четыре модуля. В errors не внесено: (1) строка transfers.DLT («не обработанные слушателем (FixedBackOff: 3 повтора через 1 с)») описывает настройку DefaultErrorHandler в общем виде и не утверждает, что недесериализуемые сообщения повторяются; нюанс «битые сообщения уходят в DLT сразу, без повторов» просто не упомянут. (2) «Все сообщения: ключ Long, значение — Transfer в JSON» не учитывает, что при ошибке десериализации в DLT пишутся исходные байты (rawTemplate в KafkaErrorHandlingConfig); для обзора допустимо. (3) «сумма резервируется» относится к лимиту: в разделе 2 прямо сказано «освобождением резерва лимита», движение средств явно отрицается. Поэтому это не неточность «резервирование средств». То, что резерв создаётся только при одобрении, опущено; это допустимое упрощение. Расхождений эталона с кодом по разделам 1, 5, 8 не обнаружено. Маркеров контаминации нет."
+}
