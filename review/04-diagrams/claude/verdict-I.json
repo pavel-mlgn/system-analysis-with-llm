@@ -1,0 +1,79 @@
+{
+  "case": "04",
+  "answer_id": "I",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Диаграмма отображает контейнеры системы из `docker-compose.yml` (`transfer-service`, `limit-service`, `screening-service`, брокер Kafka и три базы PostgreSQL)"},
+        {"atom": "b", "status": "есть", "quote": "TransferDB[(\"БД: transferdb\")] … LimitDB[(\"БД: limitdb\")] … ScreeningDB[(\"БД: screeningdb\")]"},
+        {"atom": "c", "status": "есть", "quote": "TopicTransfers[\"Топик: transfers (compact)\"] … TopicLimitResults[\"Топик: limit-results (compact)\"] … TopicScreeningResults[\"Топик: screening-results (compact)\"]"},
+        {"atom": "d", "status": "есть", "quote": "Client -->|\"HTTP/JSON: POST /transfers, GET /transfers, GET /transfers/{id}\"| TransferController … TopicTransfers -->|\"Kafka TCP: чтение топика transfers (groupId='limit')\""},
+        {"atom": "e", "status": "есть", "quote": "LimitService -->|\"Kafka TCP: публикация в топик limit-results\"| TopicLimitResults … TopicLimitResults -->|\"Kafka Streams TCP: чтение топика limit-results\"| DecisionTopology"}
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "TTS->>TDB: \"TransferRepository.saveAndFlush(TransferEntity status='NEW')\" … TC->>KT: \"publishNew() -> KafkaTemplate.send('transfers' … TC-->>Client: \"HTTP 201 Created"},
+        {"atom": "b", "status": "есть", "quote": "par \"Проверка и резервирование лимита в limit-service\" … and \"Проверка отправителя в screening-service\""},
+        {"atom": "c", "status": "есть", "quote": "and \"Формирование итогового решения в Kafka Streams (окно JoinWindows 10 сек)\" … DTC->>DTC: \"TransferDecisionService.decide() -> status='COMPLETED'\""},
+        {"atom": "d", "status": "есть", "quote": "TEL->>TTS: \"applyFinalStatus(transfer)\" … LEL->>LS: \"onFinalStatus(transfer)\" … LL->>LDB: \"ReservationRepository.findById(id) -> reservation.markCommitted()"}
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "но `screening-service` обнаруживает отправителя в таблице `blocked_senders` и возвращает `DECLINED` (`SENDER_BLOCKED`)"},
+        {"atom": "b", "status": "есть", "quote": "par \"Резервирование лимита в limit-service (успешно)\" … LL->>LDB: \"SenderUsageRepository.save(увеличен dailyUsed и monthlyUsed) и ReservationRepository.save(state='RESERVED')\""},
+        {"atom": "c", "status": "есть", "quote": "par \"Компенсация в limit-service (возврат зарезервированного лимита)\" … LL->>LL: \"usage.release(amount, reservedOn, today) и reservation.markReleased()\" … state='RELEASED'"}
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "ДИАГРАММА 4а: ER-диаграмма базы данных `transferdb` (`transfer-service`) … ДИАГРАММА 4б: ER-диаграмма базы данных `limitdb` … ДИАГРАММА 4в: ER-диаграмма базы данных `screeningdb`"},
+        {"atom": "b", "status": "есть", "quote": "Сплошная линия обозначает связь по внешнему ключу `transfer_history.transfer_id -> transfers.id` … blocked_senders |o..o{ screening_checks : \"логическая связь по sender_id (без FK)\""},
+        {"atom": "c", "status": "есть", "quote": "ДИАГРАММА 4г: ER-диаграмма объектов, не хранящихся в БД (сообщения Kafka и HTTP DTO) … сообщение `Transfer` (`transfer-common/src/main/java/com/example/common/Transfer.java`)"},
+        {"atom": "d", "status": "есть", "quote": "Пунктирная линия обозначает логическую связь по `sender_id` без внешнего ключа в БД"}
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "[*] --> NEW : \"POST /transfers -> TransferTrackingService.createTransfer()\""},
+        {"atom": "b", "status": "есть", "quote": "COMPLETED : \"limit = 'APPROVED' и screening = 'APPROVED' … CANCELLED : \"limit = 'APPROVED' и screening = 'DECLINED' … DENIED : \"limit = 'DECLINED' и screening = 'DECLINED'"},
+        {"atom": "c", "status": "есть", "quote": "COMPLETED --> [*] … CANCELLED --> [*] … DENIED --> [*]"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K4-S1", "status": "есть", "quote": "Механизм автоматического вывода перевода из статуса `NEW` по таймауту (например, если одно из ответных событий не поступило в 10-секундное окно `JoinWindows` … в коде не найден"},
+    {"id": "K4-S2", "status": "есть", "quote": "переходит в `RESERVED` (при одобрении лимита `approve()`) либо сразу в терминальное состояние `NONE` … терминальное состояние `COMMITTED` … терминальное состояние `RELEASED`"},
+    {"id": "K4-S3", "status": "есть", "quote": "participant TEL as \"TransferEventListener\" … KT->>SEL: \"onEvent(Transfer status='COMPLETED') -> пропуск (резерваций нет)\""},
+    {"id": "K4-S4", "status": "есть", "quote": "TransferErrorHandler -->|\"Kafka TCP: публикация в топик limit-results.DLT\" … LimitErrorHandler -->|\"Kafka TCP: публикация в топик transfers.DLT\""},
+    {"id": "K4-S5", "status": "есть", "quote": "DECIMAL amount \"DECIMAL(15,2) NOT NULL\" … BIGINT sender_id UK \"NOT NULL UNIQUE\" … BIGINT transfer_id FK \"NOT NULL, REFERENCES transfers(id), UNIQUE(transfer_id, stage)\""},
+    {"id": "K4-S6", "status": "есть", "quote": "sender_usage |o..o{ reservations : \"логическая связь по sender_id (без FK)\" … при `amount <= 0` в `LimitLedger.decide` запись `reservations` создаётся без сохранения `sender_usage`"},
+    {"id": "K4-S7", "status": "есть", "quote": "NEW --> CANCELLED : \"Иная комбинация статусов проверок (messageInfo = 'UNEXPECTED_RESULT...')\""}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {
+      "quote": "ответ с историей `TransferWithHistory` (`TransferController.getById` и `transfer-api.yaml`)",
+      "code_ref": "transfer-service TransferController.getById; openapi/transfer-api.yaml (схема TransferWithHistory)",
+      "explanation": "getById собирает LinkedHashMap с ключами transfer (TransferEntity) и history (список TransferHistoryEntry); в контракте это схема TransferWithHistory. Включение HTTP-ответа в ER непостоянных объектов корректно, в эталонной ER его нет."
+    },
+    {
+      "quote": "TransferRequest |o..o{ ProblemDetail : \"формируется при ошибке HTTP 400, 409, 500, 503\"",
+      "code_ref": "transfer-service TransferController.duplicate (409), TransferController.publishNew (ResponseStatusException 503), ApiExceptionHandler.handleUnexpected (500), ResponseEntityExceptionHandler и spring.mvc.problemdetails.enabled (400)",
+      "explanation": "Все четыре кода отдаются как ProblemDetail, поля type/title/status/detail/instance соответствуют классу Spring. Коды есть в разделе 6 эталона, но не как сущность ER."
+    },
+    {
+      "quote": "`transfers.id` (4а) / `Transfer.id` (4г) → `reservations.transfer_id` (4б), кардинальность `1 : 0..1`",
+      "code_ref": "limit-service LimitLedger.decide, Reservation (@Id transferId); screening-service ScreeningJournal.check, ScreeningCheck (@Id transferId)",
+      "explanation": "transferId — PK в reservations и screening_checks, повторный NEW возвращает сохранённую запись, поэтому на перевод не более одной записи. Кардинальности межбазовых логических связей в эталоне не заданы."
+    }
+  ],
+  "contamination": [],
+  "notes": "Все пять обязательных групп закрыты полностью. K4-M3 — бизнес-отказ с компенсацией: screening DECLINED SENDER_BLOCKED, резерв RESERVED → release() → RELEASED. K4-S1 закрыт текстом перед диаграммой 5: нет вывода из NEW, если ответ не пришёл в 10-секундное окно JoinWindows. На самих диаграммах эта ветка не нарисована, судьба резерва в этом случае не названа. K4-S2 закрыт перечнем состояний Reservation после диаграммы 5; по промпту второстепенные сущности перечисляются, а не рисуются. K4-S4: в цитате два ребра; на диаграмме есть и ScreeningErrorHandler → transfers.DLT, распределение продюсеров DLT верное. Сомнительные места, не внесённые в errors: (1) в описании диаграммы 3 «резервирует сумму в SenderUsage (state='RESERVED')» — поле state есть у Reservation, а не у SenderUsage. На самой диаграмме атрибуция верная (ReservationRepository.save(state='RESERVED')), и формулировка допускает верное прочтение. (2) ER 4б `sender_usage |o..o{ reservations`: со стороны reservations стоит 0..N, хотя по коду (LimitLedger.decide) строка sender_usage сохраняется только вместе с резервом, а в эталоне |{. Схема БД ноль допускает. (3) Подпись «При ошибке после 3 повторов (FixedBackOff)» относится к ошибкам обработки в слушателях и верна. Не десериализуемые сообщения уходят в DLT без повторов, но для них ответ ничего не утверждает. (4) На диаграмме 3 «уменьшен dailyUsed и monthlyUsed» — упрощение для сценария в пределах одних суток. SenderUsage.release уменьшает счётчики только своего периода, при этом вызов release(amount, reservedOn, today) показан верно. TransferWithHistory — схема из transfer-api.yaml, ответ прямо на неё ссылается, это не галлюцинация. Синтаксис Mermaid не оценивался. Расхождений эталона с кодом по разделам кейса 4 не обнаружено."
+}

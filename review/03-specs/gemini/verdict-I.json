@@ -1,0 +1,162 @@
+{
+  "case": "03",
+  "answer_id": "I",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Эндпоинт: POST /transfers… Эндпоинт: GET /transfers… Эндпоинт: GET /transfers/{id}"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "201… 200… 400… 409… 503… 500"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "200… 404… 400… 500"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "integer… number… string… array… object"
+        }
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "transfers (база: transferdb)… transfer_history (база: transferdb)… sender_usage (база: limitdb)… reservations (база: limitdb)… blocked_senders (база: screeningdb)… screening_checks (база: screeningdb)"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "amount | DECIMAL(15,2)… daily_used | DECIMAL(15,2)… monthly_used | DECIMAL(15,2)"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "transfer_id | BIGINT | да (в таблице reservations)… transfer_id | BIGINT | да (в таблице screening_checks)"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "transfer_id | BIGINT | нет | transfers(id)"
+        },
+        {
+          "atom": "e",
+          "status": "есть",
+          "quote": "uq_transfer_history_stage (UNIQUE) | transfer_id, stage"
+        },
+        {
+          "atom": "f",
+          "status": "есть",
+          "quote": "sender_id | BIGINT | нет | нет | да"
+        }
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "id | Long… senderId | Long… recipientId | Long… amount | BigDecimal… currency | String… status | String… decidedBy | String… messageInfo | String… createdAt | LocalDateTime"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "NEW, APPROVED, DECLINED, COMPLETED, CANCELLED, DENIED"
+        }
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "transfers… Число партиций 3… compact… limit-results… screening-results"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "Ключ сообщения Long… Сериализация значения Producer: JsonSerializer"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Отправители 1) transfer-service… Получатели (группа потребителей) 1) limit-service… 2) screening-service… 3) transfer-service"
+        }
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "РАСХОЖДЕНИЯ КОНТРАКТА API С КОДОМ… Код ответа 500 для POST /transfers… Код ответа 400 для GET /transfers/{id}… TransferRequest.currency (nullable)"
+        }
+      ]
+    }
+  ],
+  "strong": [
+    {
+      "id": "K3-S1",
+      "status": "есть",
+      "quote": "version | BIGINT… Версия записи для оптимистической блокировки (@Version, SenderUsage)"
+    },
+    {
+      "id": "K3-S2",
+      "status": "есть",
+      "quote": "Таблица: reservations (база: limitdb)… sender_id | BIGINT | нет | нет (в колонке FK)… Таблица: screening_checks (база: screeningdb)… sender_id | BIGINT | нет | нет"
+    },
+    {
+      "id": "K3-S3",
+      "status": "есть",
+      "quote": "transfers.DLT… limit-results.DLT… screening-results.DLT… Отправители DeadLetterPublishingRecoverer"
+    },
+    {
+      "id": "K3-S4",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K3-S5",
+      "status": "есть",
+      "quote": "RESERVED, COMMITTED, RELEASED, NONE (Reservation)"
+    },
+    {
+      "id": "K3-S6",
+      "status": "есть",
+      "quote": "application.id по умолчанию из spring.application.name = \"transfer-service\""
+    },
+    {
+      "id": "K3-S7",
+      "status": "есть",
+      "quote": "Код ответа 400 для GET /transfers/{id}… TransferRequest.currency (nullable)… Transfer.updatedAt (nullable)"
+    },
+    {
+      "id": "K3-S8",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K3-S9",
+      "status": "нет",
+      "quote": ""
+    }
+  ],
+  "errors": [],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Ответ составлен строго по шаблону, очень точный, все расхождения соответствуют эталонным. Ошибок и отклонений не найдено."
+}

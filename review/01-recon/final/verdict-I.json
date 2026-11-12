@@ -1,0 +1,72 @@
+{
+  "case": "01",
+  "answer_id": "I",
+  "mandatory": [
+    {
+      "id": "K1-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Система предназначена для приёма, автоматической проверки и учёта денежных переводов между отправителями и получателями."},
+        {"atom": "b", "status": "есть", "quote": "система параллельно проверяет соблюдение дневных и месячных лимитов отправителя (с резервированием суммы)"},
+        {"atom": "c", "status": "есть", "quote": "а также отсутствие отправителя в списке заблокированных лиц"},
+        {"atom": "d", "status": "есть", "quote": "По итогам проверок переводу присваивается финальный статус"}
+      ]
+    },
+    {
+      "id": "K1-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "асинхронным обменом событиями через брокер сообщений … В коде не найдено (HTTP REST API в `transfer-service/.../TransferController` предназначен только для внешних клиентов)"},
+        {"atom": "b", "status": "есть", "quote": "публикует событие `NEW` в Kafka, которое параллельно обрабатывают `limit-service` и `screening-service`"},
+        {"atom": "c", "status": "есть", "quote": "топология Kafka Streams в `transfer-service` (`transfer-service/.../DecisionTopologyConfig.decisionStream`) объединяет их ответы из результирующих топиков и публикует финальное решение"}
+      ]
+    },
+    {
+      "id": "K1-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "`transfer-common` | библиотека | нет … `transfer-service` | сервис | есть … `limit-service` | сервис | нет … `screening-service` | сервис | нет"},
+        {"atom": "b", "status": "есть", "quote": "`transfer-common` | библиотека | нет | Содержит общую DTO-модель перевода"},
+        {"atom": "c", "status": "есть", "quote": "`transfer-service` | сервис | есть … `limit-service` | сервис | нет … `screening-service` | сервис | нет"}
+      ]
+    },
+    {
+      "id": "K1-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Java 21"},
+        {"atom": "b", "status": "есть", "quote": "Spring Boot 3.4.1"},
+        {"atom": "c", "status": "есть", "quote": "Apache Kafka / Confluent Platform 7.6.0 (`docker-compose.yml`), Kafka Streams (`transfer-service/pom.xml`)"},
+        {"atom": "d", "status": "есть", "quote": "PostgreSQL 16 (`docker-compose.yml`), Liquibase"}
+      ]
+    },
+    {
+      "id": "K1-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "`transfer-service` — статус `NEW` (`TransferController.publishNew`) и финальный статус … группа `limit` … группа `screening` … группа `transfer-tracker`"},
+        {"atom": "b", "status": "есть", "quote": "`limit-service` (`LimitService.sendAndWait`) … `screening-service` (`ScreeningService.sendAndWait`) … `transfer-service` — слушатель истории … и поток Kafka Streams"}
+      ]
+    },
+    {
+      "id": "K1-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "образ `confluentinc/cp-kafka:7.6.0`"},
+        {"atom": "b", "status": "есть", "quote": "образ `postgres:16-alpine`, три отдельных экземпляра БД … для `transfer-service` … для `limit-service` … для `screening-service`"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K1-S1", "status": "есть", "quote": "в `transfers.DLT` — `transfer-service`, `limit-service`, `screening-service`; в `limit-results.DLT` и `screening-results.DLT` — `transfer-service`"},
+    {"id": "K1-S2", "status": "есть", "quote": "поток Kafka Streams (`DecisionTopologyConfig.decisionStream`; явный `application-id` в `application.yml` не задан, указано `spring.application.name: transfer-service`)"},
+    {"id": "K1-S3", "status": "нет", "quote": ""},
+    {"id": "K1-S4", "status": "нет", "quote": ""},
+    {"id": "K1-S5", "status": "нет", "quote": ""},
+    {"id": "K1-S6", "status": "есть", "quote": "(сервис `broker`, режим KRaft) … есть (REST API `/transfers`, порт `8080`)"}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {
+      "quote": "Maven 3.9.9 (`Dockerfile`, `pom.xml`)",
+      "code_ref": "Dockerfile: стадии FROM maven:3.9.9-eclipse-temurin-21 AS poms и AS build",
+      "explanation": "Сборка модулей в многостадийном Dockerfile идёт на образе Maven 3.9.9 с Temurin 21. Версии Maven в эталоне нет."
+    }
+  ],
+  "contamination": [],
+  "notes": "K1-M3(a): число модулей явно не названо. Засчитан исчерпывающий перечень из четырёх строк в разделе 4. K1-S2 засчитан по формулировке «явный application-id не задан, указано spring.application.name: transfer-service»: сноска 1 раздела 1 эталона разрешает формулировку «явно не задан». K1-S6 засчитан по ядру пункта: режим KRaft, сервис broker, порт 8080. Healthcheck, Dockerfile с ARG MODULE, тома и порты БД в ответе не упомянуты. Не закрыты три пункта. K1-S3: нет выключенного автосоздания топиков, compact и объявления топиков каждым сервисом. K1-S4: не сказано, что Transfer — record без зависимостей и без родителя Spring Boot. K1-S5: нет ответа 201 со статусом NEW и получения итога через GET. Не записано в errors: «Отправляют (при ошибках обработки после ретраев)». Для ошибок обработки это верно: DefaultErrorHandler с FixedBackOff(1000L, 3L). Не упомянуто, что не десериализуемые сообщения уходят в DLT сразу, но утверждения о повторах битых сообщений в ответе нет. Фразы «Перед выполнением перевода» и «списывая или возвращая резерв» не трактуются как утверждение о движении денег: в разделе 2 прямо сказано об освобождении зарезервированного лимита. Расхождений эталона с кодом в разделах 1, 5 и 8 не обнаружено."
+}

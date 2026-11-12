@@ -1,0 +1,228 @@
+{
+  "case": "05",
+  "answer_id": "I",
+  "mandatory": [
+    {
+      "id": "K5-M1",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "При поступлении события NEW с положительной суммой (amount > 0), по которому ещё нет записи в reservations, система должна считывать актуальные значения… из таблицы limit_settings."
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "отклонить перевод с решением DECLINED, причиной SINGLE_TRANSFER_LIMIT_EXCEEDED… (существующая колонка reservations.reason VARCHAR(50) вмещает новый код отказа длиной 30 символов)"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "При условии amount > single_transfer_max система должна отклонить перевод"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "применять строгий порядок проверок и фиксировать первую причину отказа: INVALID_AMOUNT → SINGLE_TRANSFER_LIMIT_EXCEEDED → DAILY_LIMIT_EXCEEDED → MONTHLY_LIMIT_EXCEEDED."
+        }
+      ]
+    },
+    {
+      "id": "K5-M2",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Если screening-service вернул APPROVED → status = \"CANCELLED\", decidedBy = \"limit\"… Если screening-service вернул DECLINED → status = \"DENIED\", decidedBy = null"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "не увеличивать daily_used и monthly_used отправителя"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "отклонить перевод с решением DECLINED… и состоянием резерва NONE, сохранить запись в reservations"
+        }
+      ]
+    },
+    {
+      "id": "K5-M3",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Добавить новую таблицу limit_settings через новую миграцию Liquibase"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "Заполнить строку id = 1 значениями из текущей конфигурации… daily_max = 50000.00, monthly_max = 200000.00. Начальное значение single_transfer_max… требует уточнения у бизнеса"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Удалить статические параметры limits.daily-max и limits.monthly-max из limit-service/src/main/resources/application.yml"
+        }
+      ]
+    },
+    {
+      "id": "K5-M4",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Вариант А (рекомендуемый): Разместить REST API непосредственно в limit-service, хранить лимиты в limit-db.… сохранение чётких границ домена"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "в текущей системе веб-сервер и внешний HTTP-порт (8080) есть только у transfer-service… требуется добавить веб-стек и валидацию в limit-service"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Эндпоинт: GET /limits\nОписание:…\nПараметры запроса:…\nПараметры ответа:…\nКоды ответа:…\nЭндпоинт: PUT /limits\nОписание:"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "При вызове PUT /limits с нарушением обязательности полей, разрядности, положительности или иерархии singleTransferMax <= dailyMax <= monthlyMax система должна отклонить запрос со статусом 400"
+        }
+      ]
+    },
+    {
+      "id": "K5-M5",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "transfer-service\nИзменений нет — сервис обрабатывает статус DECLINED от limit-service обобщённо… screening-service\nИзменений нет… transfer-common\nИзменений нет"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "При получении дублирующего сообщения NEW по уже существующему в reservations переводу система должна возвращать ранее сохранённое решение без пересчёта по обновлённым лимитам"
+        }
+      ]
+    },
+    {
+      "id": "K5-M6",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Граничное значение =: при тех же лимитах и нулевом расходе создаётся перевод ровно на 15000.00 → перевод одобряется… Граничное значение +0.01:… создаётся перевод на 15000.01 → limit-service отклоняет"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "создаётся перевод на 20000.00 (превышены и разовый, и остаток дневного лимита) → причина отказа SINGLE_TRANSFER_LIMIT_EXCEEDED"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "Динамическое применение лимитов: после уменьшения… через PUT /limits создаётся перевод на 12000.00 → перевод отклоняется с SINGLE_TRANSFER_LIMIT_EXCEEDED без перезапуска сервисов."
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "Валидация некорректных запросов PUT /limits:… singleTransferMax > dailyMax… → 400 Bad Request"
+        }
+      ]
+    },
+    {
+      "id": "K5-M7",
+      "atoms": [
+        {
+          "atom": "начальное значение",
+          "status": "есть",
+          "quote": "какое начальное значение singleTransferMax должно быть установлено в миграции БД при первом развёртывании"
+        },
+        {
+          "atom": "валюта",
+          "status": "есть",
+          "quote": "в какой валюте задаются все три лимита (предположительно RUB), требуется ли передавать/возвращать код валюты"
+        },
+        {
+          "atom": "права доступа",
+          "status": "есть",
+          "quote": "Кто будет вызывать GET /limits и PUT /limits (закрытый контур или требуется защита эндпоинтов)"
+        },
+        {
+          "atom": "аудит",
+          "status": "есть",
+          "quote": "нужно ли вести журнал аудита изменений лимитов (время, инициатор, старые и новые значения)?"
+        },
+        {
+          "atom": "снижение ниже израсходованного",
+          "status": "нет",
+          "quote": ""
+        }
+      ]
+    }
+  ],
+  "strong": [
+    {
+      "id": "K5-S1",
+      "status": "есть",
+      "quote": "Вариант А (рекомендуемый): Разместить REST API непосредственно в limit-service… Плюсы… Минусы… Вариант Б: Разместить публичные эндпоинты в transfer-service… Вариант В:… transfer-service (transfer-db)"
+    },
+    {
+      "id": "K5-S2",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K5-S3",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K5-S4",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K5-S5",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K5-S6",
+      "status": "есть",
+      "quote": "операции обновления PUT /limits не должны брать длительных эксклюзивных блокировок на таблицу limit_settings, которые могли бы задержать транзакции чтения в limit-service дольше окна агрегации"
+    },
+    {
+      "id": "K5-S7",
+      "status": "есть",
+      "quote": "Если screening-service вернул APPROVED → status = \"CANCELLED\", decidedBy = \"limit\"… Если screening-service вернул DECLINED → status = \"DENIED\", decidedBy = null, messageInfo = \"SINGLE_TRANSFER_LIMIT_EXCEEDED; SENDER_BLOCKED\""
+    },
+    {
+      "id": "K5-S8",
+      "status": "есть",
+      "quote": "CHECK (single_transfer_max <= daily_max AND daily_max <= monthly_max) — непротиворечивость порогов между собой."
+    },
+    {
+      "id": "K5-S9",
+      "status": "есть",
+      "quote": "новый порог singleTransferMax будет сравниваться с числовым amount без учёта валюты (например, перевод в USD или EUR будет проверен по рублёвому порогу как одноимённое число)"
+    },
+    {
+      "id": "K5-S10",
+      "status": "есть",
+      "quote": "Заблокированный отправитель… отправляет перевод на сумму больше singleTransferMax → финальный статус перевода DENIED… Идемпотентность при смене лимитов: повторная доставка события NEW… возвращается прежнее решение"
+    }
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {
+      "quote": "при отказе по DAILY_LIMIT_EXCEEDED или MONTHLY_LIMIT_EXCEEDED всё равно выполняется сохранение sender_usage, что создаёт нулевые записи для новых отправителей и увеличивает version при срабатывании lazyReset",
+      "code_ref": "limit-service LimitLedger.decide",
+      "explanation": "usageRepository.save(usage) вызывается безусловно в конце метода (кроме ветки INVALID_AMOUNT), из-за чего для отклонённого перевода нового пользователя создаётся строка с нулевыми расходами."
+    }
+  ],
+  "contamination": [],
+  "notes": "Модель предоставила детальный и технически точный ответ с отличным пониманием существующей системы и полным соответствием формату промпта."
+}

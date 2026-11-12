@@ -39,6 +39,11 @@
       "source": "experiment/01-recon/answer-claude-opus-5.5-max-claude-code.md",
       "model": "claude-opus-5.5-max-claude-code",
       "markers_removed": 0
+    },
+    "I": {
+      "source": "experiment/01-recon/answer-gemini-4-carbon-high.md",
+      "model": "gemini-4-carbon-high",
+      "markers_removed": 0
     }
   },
   "02": {
@@ -80,6 +85,11 @@
     "H": {
       "source": "experiment/02-business-logic/answer-claude-opus-5.5-max-claude-code.md",
       "model": "claude-opus-5.5-max-claude-code",
+      "markers_removed": 0
+    },
+    "I": {
+      "source": "experiment/02-business-logic/answer-gemini-4-carbon-high.md",
+      "model": "gemini-4-carbon-high",
       "markers_removed": 0
     }
   },
@@ -123,6 +133,11 @@
       "source": "experiment/03-specs/answer-claude-opus-5.5-max-claude-code.md",
       "model": "claude-opus-5.5-max-claude-code",
       "markers_removed": 0
+    },
+    "I": {
+      "source": "experiment/03-specs/answer-gemini-4-carbon-high.md",
+      "model": "gemini-4-carbon-high",
+      "markers_removed": 0
     }
   },
   "04": {
@@ -165,6 +180,11 @@
       "source": "experiment/04-diagrams/answer-claude-opus-5.5-max-claude-code.md",
       "model": "claude-opus-5.5-max-claude-code",
       "markers_removed": 0
+    },
+    "I": {
+      "source": "experiment/04-diagrams/answer-gemini-4-carbon-high.md",
+      "model": "gemini-4-carbon-high",
+      "markers_removed": 0
     }
   },
   "05": {
@@ -206,6 +226,11 @@
     "H": {
       "source": "experiment/05-change-request/answer-claude-opus-5.5-max-claude-code.md",
       "model": "claude-opus-5.5-max-claude-code",
+      "markers_removed": 0
+    },
+    "I": {
+      "source": "experiment/05-change-request/answer-gemini-4-carbon-high.md",
+      "model": "gemini-4-carbon-high",
       "markers_removed": 0
     }
   }

@@ -1,0 +1,66 @@
+{
+  "case": "01",
+  "answer_id": "I",
+  "mandatory": [
+    {
+      "id": "K1-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "приёма, автоматической проверки и учёта денежных переводов между отправителями и получателями"},
+        {"atom": "b", "status": "есть", "quote": "проверяет соблюдение дневных и месячных лимитов отправителя (с резервированием суммы)"},
+        {"atom": "c", "status": "есть", "quote": "отсутствие отправителя в списке заблокированных лиц"},
+        {"atom": "d", "status": "есть", "quote": "По итогам проверок переводу присваивается финальный статус"}
+      ]
+    },
+    {
+      "id": "K1-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "асинхронным обменом событиями через брокер сообщений… Прямых зависимостей сервисов друг от друга нет"},
+        {"atom": "b", "status": "есть", "quote": "параллельно проверяет… параллельно обрабатывают limit-service и screening-service"},
+        {"atom": "c", "status": "есть", "quote": "топология Kafka Streams в transfer-service… объединяет их ответы и публикует финальное решение обратно"}
+      ]
+    },
+    {
+      "id": "K1-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfer-common… transfer-service… limit-service… screening-service"},
+        {"atom": "b", "status": "есть", "quote": "transfer-common | библиотека | нет"},
+        {"atom": "c", "status": "есть", "quote": "transfer-service | сервис | есть (REST API /transfers, порт 8080)… limit-service | сервис | нет… screening-service | сервис | нет"}
+      ]
+    },
+    {
+      "id": "K1-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Java 21"},
+        {"atom": "b", "status": "есть", "quote": "Spring Boot 3.4.1"},
+        {"atom": "c", "status": "есть", "quote": "Apache Kafka / Confluent Platform 7.6.0… Kafka Streams"},
+        {"atom": "d", "status": "есть", "quote": "PostgreSQL 16… Liquibase"}
+      ]
+    },
+    {
+      "id": "K1-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Топик transfers… Отправляет: transfer-service… Получают: limit-service (…группа limit); screening-service (…группа screening); transfer-service (…группа transfer-tracker)"},
+        {"atom": "b", "status": "есть", "quote": "Топик limit-results… Отправляет: limit-service… Получают: transfer-service… Топик screening-results… Отправляет: screening-service… Получают: transfer-service"}
+      ]
+    },
+    {
+      "id": "K1-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Apache Kafka — образ confluentinc/cp-kafka:7.6.0 (сервис broker, режим KRaft)"},
+        {"atom": "b", "status": "есть", "quote": "PostgreSQL 16 — образ postgres:16-alpine, три отдельных экземпляра БД: transfer-db… limit-db… screening-db"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K1-S1", "status": "есть", "quote": "в transfers.DLT — transfer-service, limit-service, screening-service; в limit-results.DLT и screening-results.DLT — transfer-service"},
+    {"id": "K1-S2", "status": "есть", "quote": "явный application-id в application.yml не задан, указано spring.application.name: transfer-service"},
+    {"id": "K1-S3", "status": "нет", "quote": ""},
+    {"id": "K1-S4", "status": "нет", "quote": ""},
+    {"id": "K1-S5", "status": "нет", "quote": ""},
+    {"id": "K1-S6", "status": "нет", "quote": ""}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Ответ полностью соответствует эталону и содержит множество точных деталей из кода, не содержит ошибок."
+}

@@ -13,6 +13,7 @@ NAMES = {
     "gemini-4-argon-high": "Gemini 4 Argon High",
     "kimi-k3.1-pro-max": "Kimi K3.1 Pro Max",
     "claude-opus-5.5-max-claude-code": "Claude Opus 5.5 Max (Claude Code)",
+    "gemini-4-carbon-high": "Gemini 4 Carbon High",
 }
 CASES = ["01-recon", "02-business-logic", "03-specs", "04-diagrams", "05-change-request"]
 

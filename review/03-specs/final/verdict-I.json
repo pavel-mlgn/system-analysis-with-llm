@@ -1,0 +1,88 @@
+{
+  "case": "03",
+  "answer_id": "I",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Эндпоинт: POST /transfers … Эндпоинт: GET /transfers … Эндпоинт: GET /transfers/{id}"},
+        {"atom": "b", "status": "есть", "quote": "`201` | Новый перевод … `200` | Перевод с указанным `id` и идентичными параметрами … `400` | Некорректный JSON … `409` | Перевод с указанным `id` уже существует с другими … `503` | Ошибка"},
+        {"atom": "c", "status": "есть", "quote": "`200` | Перевод с указанным `id` найден (`TransferController.getById`) … `404` | Перевод с указанным `id` не найден"},
+        {"atom": "d", "status": "есть", "quote": "`id` | body | `integer` | да … `amount` | body | `number` | да … `currency` | body | `string` | нет … `history` | `array` | нет"}
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfers (база: transferdb) … transfer_history (база: transferdb) … sender_usage (база: limitdb) … reservations (база: limitdb) … blocked_senders (база: screeningdb) … screening_checks"},
+        {"atom": "b", "status": "есть", "quote": "`amount` | `DECIMAL(15,2)` | нет | нет | нет | да | — | нет | Сумма перевода … `daily_used` | `DECIMAL(15,2)` … `monthly_used` | `DECIMAL(15,2)`"},
+        {"atom": "c", "status": "есть", "quote": "Таблица: reservations (база: limitdb) … | `transfer_id` | `BIGINT` | да | нет | да | да | — | PK | … Таблица: screening_checks (база: screeningdb) … | `transfer_id` | `BIGINT` | да |"},
+        {"atom": "d", "status": "есть", "quote": "| `transfer_id` | `BIGINT` | нет | `transfers(id)` | нет | да |"},
+        {"atom": "e", "status": "есть", "quote": "| `uq_transfer_history_stage` (`UNIQUE`) | `transfer_id, stage` |"},
+        {"atom": "f", "status": "есть", "quote": "| `sender_id` | `BIGINT` | нет | нет | да | да | — | `UNIQUE`, `idx_blocked_senders_sender_id` |"}
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "`id` | `Long` … `senderId` | `Long` … `recipientId` … `amount` | `BigDecimal` … `currency` | `String` … `status` | `String` … `decidedBy` | `String` … `messageInfo` … `createdAt` | `LocalDateTime`"},
+        {"atom": "b", "status": "есть", "quote": "| `status` | `String` | нет | Статус перевода или этапа (`NEW`, `APPROVED`, `DECLINED`, `COMPLETED`, `CANCELLED`, `DENIED`) |"}
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Канал: transfers … `3` (`TopicsConfig.transfersTopic` … `compact` (`TopicBuilder.compact()`) … Канал: limit-results … `3` … `compact` … Канал: screening-results … `3` … `compact`"},
+        {"atom": "b", "status": "есть", "quote": "Ключ сообщения | `Long` — идентификатор перевода (`transfer.id()`) … Сериализация значения | Producer: `JsonSerializer`"},
+        {"atom": "c", "status": "есть", "quote": "Отправители | 1) `transfer-service` … метод `publishNew` … `groupId = \"limit\"` … `groupId = \"screening\"` … `groupId = \"transfer-tracker\"` … Отправители | `limit-service`"}
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "### 4. РАСХОЖДЕНИЯ КОНТРАКТА API С КОДОМ … Ответ `500` не описан ни для одного эндпоинта"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K3-S1", "status": "есть", "quote": "| `version` | `BIGINT` | нет | нет | нет | да | `0` | нет | Версия записи для оптимистической блокировки (`@Version`, `SenderUsage`) |"},
+    {"id": "K3-S2", "status": "нет", "quote": ""},
+    {"id": "K3-S3", "status": "есть", "quote": "`3` (`KafkaErrorHandlingConfig.transfersDlt` в `transfer-service`, `limit-service`, `screening-service`) … Канал: limit-results.DLT … `DeadLetterPublishingRecoverer` в `transfer-service`"},
+    {"id": "K3-S4", "status": "нет", "quote": ""},
+    {"id": "K3-S5", "status": "есть", "quote": "| `state` | `RESERVED`, `COMMITTED`, `RELEASED`, `NONE` (`Reservation`) |"},
+    {"id": "K3-S6", "status": "есть", "quote": "`application.id` по умолчанию из `spring.application.name` = `\"transfer-service\"`"},
+    {"id": "K3-S7", "status": "есть", "quote": "Код ответа `400` для `GET /transfers/{id}` | Описаны только коды `200` и `404` … `TransferRequest.currency` (`nullable`) | В OpenAPI 3.0.3 свойство объявлено без `nullable: true`"},
+    {"id": "K3-S8", "status": "нет", "quote": ""},
+    {"id": "K3-S9", "status": "нет", "quote": ""}
+  ],
+  "errors": [
+    {
+      "quote": "| `createdAt` | `LocalDateTime` | нет | Дата и время создания перевода | `\"2025-01-15T12:30:00\"` |",
+      "category": "неточность",
+      "etalon_ref": "4.4; раздел 8 («Частые искажения»)",
+      "code_ref": "application.yml всех сервисов (spring.kafka.producer.value-serializer: JsonSerializer); transfer-service application.yml (streams default.value.serde: JsonSerde); KafkaErrorHandlingConfig.kafkaErrorHandler (new JsonSerializer<>())",
+      "explanation": "JsonSerializer/JsonSerde заданы по имени класса и используют собственный ObjectMapper spring-kafka, а не настроенный Spring Boot. Поэтому LocalDateTime в Kafka пишется массивом [год, месяц, день, час, мин, сек, нано] (5–7 элементов), а не ISO-строкой. ISO-строка верна только для REST-ответов. Эталон 4.4 прямо относит пример ISO-строкой к неточностям."
+    },
+    {
+      "quote": "| Типизация `Transfer.status` и `HistoryEntry.status` | Заданы строгие перечисления `enum` … поле `status` имеет тип `String` без проверки по enum",
+      "category": "ложная_аномалия",
+      "etalon_ref": "6.1, «Выдуманные расхождения»; специфичные штрафы кейса 3",
+      "code_ref": "TransferTrackingService.createTransfer/applyFinalStatus/recordServiceResult; TransferDecisionService.decide; LimitLedger.decide (Reservation.approve/decline); ScreeningJournal.check; transfer-api.yaml (TransferStatus, HistoryEntry.status)",
+      "explanation": "В status перевода код пишет только NEW и COMPLETED/CANCELLED/DENIED (из TransferDecisionService.decide). В историю он пишет NEW, APPROVED/DECLINED (от LimitLedger и ScreeningJournal) и итоговые статусы. Это ровно значения enum контракта. Тип String в Java при совпадающих значениях не является расхождением контракта. Эталон 6.1 прямо относит «enum в контракте против String в коде» к выдуманным расхождениям."
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "`Long` (при ошибке обработки) или `byte[]` (при ошибке десериализации ключа) … `DelegatingByTypeSerializer` (`Long` -> `LongSerializer`, `byte[]` -> `ByteArraySerializer`",
+      "code_ref": "KafkaErrorHandlingConfig.keySerializer и KafkaErrorHandlingConfig.kafkaErrorHandler (transfer-service, limit-service, screening-service)",
+      "explanation": "DLT-шаблоны сериализуют ключ через DelegatingByTypeSerializer (Long → LongSerializer, byte[] → ByteArraySerializer). При ошибке десериализации ключа DeadLetterPublishingRecoverer публикует исходные байты ключа. Шаблон для значения выбирается по типу: byte[] → ByteArraySerializer, иначе JsonSerializer. Эталон (5.2, F-4) описывает только значение DLT-сообщения, ключ не описан."
+    },
+    {
+      "quote": "а в `org.springframework.http.ProblemDetail` для `type` и `instance` — `java.net.URI` (`uri`)",
+      "code_ref": "transfer-api.yaml (components.schemas.Problem); ApiExceptionHandler.handleUnexpected, TransferController.duplicate (ProblemDetail)",
+      "explanation": "В ProblemDetail поля type и instance имеют тип URI, а в схеме Problem контракта они описаны как string без format. Это формальное дополнение к расхождению O4."
+    }
+  ],
+  "contamination": [],
+  "notes": "Все группы M закрыты. K3-M5 закрыт расхождением O1 (код 500). K3-S7 закрыт расхождениями O2 и O6, в ответе также есть O4, O5 и O7, так что двойного зачёта нет. K3-S2 не засчитан: в таблицах limitdb и screeningdb колонка FK заполнена «нет» по формату промпта, но о логических связях по sender_id и transfer_id ничего не сказано. Это пограничный случай. K3-S4 не засчитан: значения status даны одним общим списком без разбивки по каналам, хотя атом K3-M3(b) этим закрыт. K3-S8 (__TypeId__) и K3-S9 отсутствуют; для createdAt в Kafka дан противоположный пример ISO-строкой, он учтён в errors. По строке «Типизация status» фактическая часть верна: трекер не проверяет значение status. Но код производит ровно значения enum контракта, поэтому по 6.1 это выдуманное расхождение. В строке про форматы дат LocalDateTime назван «ISO-8601 date-time». Формально format date-time в OpenAPI (RFC 3339) требует смещения часового пояса, которого у LocalDateTime нет; это не штрафовалось. Расхождений эталона с кодом по разделам 4–6 не обнаружено."
+}
