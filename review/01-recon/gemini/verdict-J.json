@@ -1,0 +1,66 @@
+{
+  "case": "01",
+  "answer_id": "J",
+  "mandatory": [
+    {
+      "id": "K1-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Система принимает заявки на денежные переводы и по каждой выносит итоговое решение"},
+        {"atom": "b", "status": "есть", "quote": "Решение строится на двух независимых проверках: дневного и месячного лимитов отправителя"},
+        {"atom": "c", "status": "есть", "quote": "и наличия отправителя в списке заблокированных"},
+        {"atom": "d", "status": "есть", "quote": "Решение строится на двух независимых проверках: дневного и месячного лимитов отправителя и наличия отправителя"}
+      ]
+    },
+    {
+      "id": "K1-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "между собой они общаются только через топики Kafka (хореография, без оркестратора)… Синхронные вызовы между сервисами в коде не найдены"},
+        {"atom": "b", "status": "есть", "quote": "limit-service и screening-service независимо публикуют вердикты в limit-results и screening-results"},
+        {"atom": "c", "status": "есть", "quote": "transfer-service сводит их (Kafka Streams join с окном 10 с"}
+      ]
+    },
+    {
+      "id": "K1-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfer-common | библиотека… transfer-service | сервис… limit-service | сервис… screening-service | сервис"},
+        {"atom": "b", "status": "есть", "quote": "transfer-common | библиотека | нет"},
+        {"atom": "c", "status": "есть", "quote": "Синхронно работают только внешний REST API transfer-service"}
+      ]
+    },
+    {
+      "id": "K1-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Java 21"},
+        {"atom": "b", "status": "есть", "quote": "Spring Boot 3.4.1"},
+        {"atom": "c", "status": "есть", "quote": "Spring for Apache Kafka, Kafka Streams… Apache Kafka"},
+        {"atom": "d", "status": "есть", "quote": "Liquibase… PostgreSQL 16"}
+      ]
+    },
+    {
+      "id": "K1-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfers | transfer-service: событие NEW… | limit-service — TransferEventsListener.onEvent (limit); screening-service — TransferEventsListener.onEvent (screening); transfer-service — TransferEventL"},
+        {"atom": "b", "status": "есть", "quote": "limit-results | limit-service… | transfer-service — DecisionTopologyConfig.decisionStream… screening-results | screening-service… | те же два потребителя, что у limit-results"}
+      ]
+    },
+    {
+      "id": "K1-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Apache Kafka (образ confluentinc/cp-kafka:7.6.0"},
+        {"atom": "b", "status": "есть", "quote": "PostgreSQL 16… три отдельных экземпляра: transfer-db (БД transferdb, порт хоста 5434), limit-db (limitdb, 5432), screening-db (screeningdb, 5433)"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K1-S1", "status": "есть", "quote": "в transfers.DLT — все три сервиса, в остальные два — только transfer-service"},
+    {"id": "K1-S2", "status": "есть", "quote": "Свойства spring.kafka.streams.application-id в application.yml нет. По умолчанию Spring Boot подставляет spring.application.name, то есть transfer-service"},
+    {"id": "K1-S3", "status": "есть", "quote": "Три рабочих топика имеют по 3 партиции и политику compact; они объявлены в TopicsConfig каждого сервиса… Автосоздание топиков отключено"},
+    {"id": "K1-S4", "status": "есть", "quote": "сервисы наследуются от spring-boot-starter-parent, у transfer-common родителя нет"},
+    {"id": "K1-S5", "status": "нет", "quote": ""},
+    {"id": "K1-S6", "status": "есть", "quote": "один брокер в режиме KRaft… Порт 9092 открыт с хоста, 29092 используется внутри сети compose… БД transferdb, порт хоста 5434"}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "В K1-S4 засчитан вывод об отсутствии родителя Spring Boot у transfer-common, хотя 'record' в ответе не упомянут."
+}

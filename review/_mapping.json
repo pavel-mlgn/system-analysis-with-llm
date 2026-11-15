@@ -44,6 +44,21 @@
       "source": "experiment/01-recon/answer-gemini-4-carbon-high.md",
       "model": "gemini-4-carbon-high",
       "markers_removed": 0
+    },
+    "J": {
+      "source": "experiment/01-recon/answer-claude-fable-5.2-max.md",
+      "model": "claude-fable-5.2-max",
+      "markers_removed": 0
+    },
+    "K": {
+      "source": "experiment/01-recon/answer-alice-ai-expert.md",
+      "model": "alice-ai-expert",
+      "markers_removed": 0
+    },
+    "L": {
+      "source": "experiment/01-recon/answer-gigachat-3.5-ultra-reasoning.md",
+      "model": "gigachat-3.5-ultra-reasoning",
+      "markers_removed": 0
     }
   },
   "02": {
@@ -90,6 +105,21 @@
     "I": {
       "source": "experiment/02-business-logic/answer-gemini-4-carbon-high.md",
       "model": "gemini-4-carbon-high",
+      "markers_removed": 0
+    },
+    "J": {
+      "source": "experiment/02-business-logic/answer-claude-fable-5.2-max.md",
+      "model": "claude-fable-5.2-max",
+      "markers_removed": 0
+    },
+    "K": {
+      "source": "experiment/02-business-logic/answer-alice-ai-expert.md",
+      "model": "alice-ai-expert",
+      "markers_removed": 0
+    },
+    "L": {
+      "source": "experiment/02-business-logic/answer-gigachat-3.5-ultra-reasoning.md",
+      "model": "gigachat-3.5-ultra-reasoning",
       "markers_removed": 0
     }
   },
@@ -138,6 +168,21 @@
       "source": "experiment/03-specs/answer-gemini-4-carbon-high.md",
       "model": "gemini-4-carbon-high",
       "markers_removed": 0
+    },
+    "J": {
+      "source": "experiment/03-specs/answer-claude-fable-5.2-max.md",
+      "model": "claude-fable-5.2-max",
+      "markers_removed": 0
+    },
+    "K": {
+      "source": "experiment/03-specs/answer-alice-ai-expert.md",
+      "model": "alice-ai-expert",
+      "markers_removed": 0
+    },
+    "L": {
+      "source": "experiment/03-specs/answer-gigachat-3.5-ultra-reasoning.md",
+      "model": "gigachat-3.5-ultra-reasoning",
+      "markers_removed": 0
     }
   },
   "04": {
@@ -185,6 +230,21 @@
       "source": "experiment/04-diagrams/answer-gemini-4-carbon-high.md",
       "model": "gemini-4-carbon-high",
       "markers_removed": 0
+    },
+    "J": {
+      "source": "experiment/04-diagrams/answer-claude-fable-5.2-max.md",
+      "model": "claude-fable-5.2-max",
+      "markers_removed": 0
+    },
+    "K": {
+      "source": "experiment/04-diagrams/answer-alice-ai-expert.md",
+      "model": "alice-ai-expert",
+      "markers_removed": 0
+    },
+    "L": {
+      "source": "experiment/04-diagrams/answer-gigachat-3.5-ultra-reasoning.md",
+      "model": "gigachat-3.5-ultra-reasoning",
+      "markers_removed": 0
     }
   },
   "05": {
@@ -231,6 +291,21 @@
     "I": {
       "source": "experiment/05-change-request/answer-gemini-4-carbon-high.md",
       "model": "gemini-4-carbon-high",
+      "markers_removed": 0
+    },
+    "J": {
+      "source": "experiment/05-change-request/answer-claude-fable-5.2-max.md",
+      "model": "claude-fable-5.2-max",
+      "markers_removed": 0
+    },
+    "K": {
+      "source": "experiment/05-change-request/answer-alice-ai-expert.md",
+      "model": "alice-ai-expert",
+      "markers_removed": 0
+    },
+    "L": {
+      "source": "experiment/05-change-request/answer-gigachat-3.5-ultra-reasoning.md",
+      "model": "gigachat-3.5-ultra-reasoning",
       "markers_removed": 0
     }
   }

@@ -1,0 +1,85 @@
+{
+  "case": "01",
+  "answer_id": "K",
+  "mandatory": [
+    {
+      "id": "K1-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Система обработки денежных переводов: клиент создаёт перевод через REST API, а система решает, провести его или отклонить."},
+        {"atom": "b", "status": "есть", "quote": "Решение принимается двумя проверками — **лимитами отправителя** (дневной и месячный потолок трат)"},
+        {"atom": "c", "status": "есть", "quote": "и **скринингом** (блок-листы отправителей)"},
+        {"atom": "d", "status": "есть", "quote": "Решение принимается двумя проверками … после чего итоговый статус и вся история проверки сохраняются в базе."}
+      ]
+    },
+    {
+      "id": "K1-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "сервисы обмениваются сообщениями только через Kafka, без прямых вызовов друг друга"},
+        {"atom": "b", "status": "есть", "quote": "публикует событие `NEW` → `limit-service` и `screening-service` независимо проверяют его и публикуют результаты"},
+        {"atom": "c", "status": "есть", "quote": "`transfer-service` соединяет результаты stream-join'ом (Kafka Streams) в итоговое решение"}
+      ]
+    },
+    {
+      "id": "K1-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "| `transfer-common` | библиотека | нет | … | `transfer-service` | сервис | **есть** … | `limit-service` | сервис | нет | … | `screening-service` | сервис | нет |"},
+        {"atom": "b", "status": "есть", "quote": "| `transfer-common` | библиотека | нет | Общая модель события `Transfer` (record) для всех сервисов |"},
+        {"atom": "c", "status": "есть", "quote": "`transfer-service` | сервис | **есть** (REST `/transfers` … `limit-service` | сервис | нет … `screening-service` | сервис | нет … HTTP/gRPC-вызовов между самими сервисами в коде не найдено"}
+      ]
+    },
+    {
+      "id": "K1-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Java 21 (`java.version` в pom.xml)"},
+        {"atom": "b", "status": "есть", "quote": "Spring Boot 3.4.1 (spring-boot-starter-parent в pom.xml модулей)"},
+        {"atom": "c", "status": "есть", "quote": "Spring Kafka и Kafka Streams (версии — из BOM Boot, явно не указаны)"},
+        {"atom": "d", "status": "есть", "quote": "PostgreSQL JDBC driver, Liquibase"}
+      ]
+    },
+    {
+      "id": "K1-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "публикует `NEW` из `TransferController.publishNew`, а также итоговые решения … (группа `limit`), `screening-service` (группа `screening`), `transfer-service` (группа `transfer-tracker`)"},
+        {"atom": "b", "status": "есть", "quote": "`limit-results` | `limit-service` (`LimitService.sendAndWait`) | `transfer-service`: Kafka Streams join (`DecisionTopologyConfig`) и трекер … `screening-results` | `screening-service`"}
+      ]
+    },
+    {
+      "id": "K1-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "**Kafka** — `confluentinc/cp-kafka:7.6.0`"},
+        {"atom": "b", "status": "есть", "quote": "**PostgreSQL** — `postgres:16-alpine`, три отдельных экземпляра, по одному на сервис"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K1-S1", "status": "нет", "quote": ""},
+    {"id": "K1-S2", "status": "нет", "quote": ""},
+    {"id": "K1-S3", "status": "есть", "quote": "автосоздание топиков отключено, 3 топика создаются кодом (`TopicsConfig` каждого сервиса)"},
+    {"id": "K1-S4", "status": "нет", "quote": ""},
+    {"id": "K1-S5", "status": "нет", "quote": ""},
+    {"id": "K1-S6", "status": "есть", "quote": "KRaft-режим (без ZooKeeper) … `transferdb` (порт 5434), `limitdb` (5432), `screeningdb` (5433)"}
+  ],
+  "errors": [
+    {
+      "quote": "| `transfers.DLT`, `limit-results.DLT`, `screening-results.DLT` | DeadLetterPublishingRecoverer (3 копии `KafkaErrorHandlingConfig` — по одной в каждом сервисе) |",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "раздел 1 (каналы Kafka); раздел 5.1; раздел 8 («`*-results.DLT` пишут все сервисы»); K1-S1",
+      "code_ref": "limit-service и screening-service KafkaErrorHandlingConfig (только transfersDlt); transfer-service KafkaErrorHandlingConfig (transfersDlt, limitResultsDlt, screeningResultsDlt); limit/screening TransferEventsListener.onEvent (topics = \"transfers\")",
+      "explanation": "Строка таблицы назначает отправителями всех трёх DLT-топиков обработчики ошибок всех трёх сервисов. В коде limit-service и screening-service слушают только `transfers` и пишут только в `transfers.DLT`; `limit-results.DLT` и `screening-results.DLT` объявляет и пишет только transfer-service (трекер). Конфиги к тому же не идентичные копии: в transfer-service объявлены два дополнительных DLT-топика."
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "Maven 3.9.9 (Dockerfile)",
+      "code_ref": "Dockerfile: FROM maven:3.9.9-eclipse-temurin-21 AS poms / AS build",
+      "explanation": "Версия Maven для сборки образов задана в многостадийном Dockerfile; в эталоне версия Maven не указана."
+    },
+    {
+      "quote": "при локальной разработке без Docker база `transfer-service` по умолчанию ждёт порт `5434` (`application.yml` transfer-service), что совпадает с маппингом `transfer-db` из compose",
+      "code_ref": "transfer-service application.yml (spring.datasource.url jdbc:postgresql://localhost:5434/transferdb); docker-compose.yml transfer-db ports 5434:5432; application-docker.yml (transfer-db:5432)",
+      "explanation": "Профиль по умолчанию рассчитан на локальный запуск сервиса против БД из compose по опубликованному порту; профиль docker переключает на внутреннее имя transfer-db:5432. Аналогично limit (5432) и screening (5433)."
+    }
+  ],
+  "contamination": [],
+  "notes": "1) Ответ начинается служебной фразой «Файл обрезался на transfer-service — дозаапрошу недостающую часть.», а в разделе 5 сказано «точный список требует уточнения, контроллер в файле виден частично». В code.txt TransferController приведён целиком (POST /transfers, GET /transfers, GET /transfers/{id}), то есть список эндпоинтов определим; это утверждение о входных данных модели, а не о поведении системы, поэтому в errors не записано. 2) K1-M2(b): «параллельно» прямо не сказано, засчитано по однозначной конструкции: обе проверки независимо получают одно и то же событие NEW, результаты затем соединяются join-ом. 3) K1-M3(a): число модулей не названо, засчитано по таблице, где перечислены ровно четыре модуля. 4) K1-S3: compact не упомянут, засчитано по ядру пункта (автосоздание выключено, топики объявляет каждый сервис). 5) K1-S6: засчитано по KRaft и портам БД; healthcheck, ARG MODULE и тома не упомянуты, но слова «полностью» в пункте нет. 6) Ошибка по DLT: утверждение сгруппировано, а не сформулировано отдельно для каждого топика, но структура таблицы назначает отправителей всем трём DLT; категория взята по разделу 8. Если трактовать группировку мягче, это неточность. 7) «резервирование суммы» в описании limit-service в errors не записано: речь о резерве суммы в счётчиках лимита (SenderUsage.reserve), а не о «резервировании средств». 8) Расхождений эталона с кодом не обнаружено. Ручная сверка: расхождений верификаторов по пунктам нет (24 из 24). Ошибку по DLT нашли оба верификатора с одной категорией; подтверждена по коду: KafkaErrorHandlingConfig в limit-service и screening-service объявляет только transfers.DLT, limit-results.DLT и screening-results.DLT объявляет и пишет только transfer-service. Записана один раз как мелкая_ошибка, так же решено для ответов D и E кейса 1."
+}

@@ -1,0 +1,79 @@
+{
+  "case": "04",
+  "answer_id": "J",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "три Spring Boot-сервиса, брокер Kafka и три базы PostgreSQL"},
+        {"atom": "b", "status": "есть", "quote": "Базы данных: PostgreSQL, образ postgres:16-alpine, отдельный контейнер на сервис, схемы создаёт Liquibase"},
+        {"atom": "c", "status": "есть", "quote": "топик transfers<br/>3 партиции, compact … топик limit-results<br/>3 партиции, compact … топик screening-results<br/>3 партиции, compact"},
+        {"atom": "d", "status": "есть", "quote": "Kafka produce: топик transfers, key=id, value=Transfer JSON, status=NEW … Kafka consume: топик transfers, groupId=limit … JDBC, PostgreSQL: jdbc:postgresql://limit-db:5432/limitdb"},
+        {"atom": "e", "status": "есть", "quote": "между собой сервисы общаются только через топики Kafka, REST API есть только у `transfer-service`"}
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "TTS->>TDB: saveAndFlush(TransferEntity status=NEW) … TC->>K: publishNew, send в топик transfers, key=id, Transfer status=NEW … TC-->>Client: 201 Created, TransferEntity status=NEW"},
+        {"atom": "b", "status": "есть", "quote": "par limit-service, groupId=limit … and screening-service, groupId=screening"},
+        {"atom": "c", "status": "есть", "quote": "K-)DS: топики limit-results и screening-results,<br/>join по ключу id в окне 10 с"},
+        {"atom": "d", "status": "есть", "quote": "K-)TEL: топик transfers, Transfer status=COMPLETED … K-)LEL: топик transfers, Transfer status=COMPLETED"}
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Отправитель найден в `blocked_senders` … итог — CANCELLED с `decidedBy=screening`"},
+        {"atom": "b", "status": "есть", "quote": "а `limit-service` к этому моменту уже зарезервировал лимит … save(Reservation decision=APPROVED, state=RESERVED)"},
+        {"atom": "c", "status": "есть", "quote": "LLG->>LLG: SenderUsage.release(amount, reservedOn, today) … LLG->>LDB: Reservation.markReleased, save(Reservation state=RELEASED)"}
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "### 4а. База transferdb (transfer-service) … ### 4б. База limitdb (limit-service) … ### 4в. База screeningdb (screening-service)"},
+        {"atom": "b", "status": "есть", "quote": "transfers ||--o{ transfer_history : \"FK transfer_id, UNIQUE (transfer_id, stage)\" … внешних ключей в схеме нет"},
+        {"atom": "c", "status": "есть", "quote": "### 4г. Объекты, которые не хранятся в БД … Record `Transfer` (`transfer-common`, сообщение во всех трёх топиках)"},
+        {"atom": "d", "status": "есть", "quote": "blocked_senders |o..o{ screening_checks : \"sender_id, без FK\" … Логические связи между сущностями разных диаграмм (без FK, по значению идентификатора)"}
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "[*] --> NEW : POST /transfers, TransferTrackingService.createTransfer"},
+        {"atom": "b", "status": "есть", "quote": "decision --> COMPLETED : limit APPROVED и screening APPROVED … decision --> CANCELLED : limit DECLINED и screening APPROVED … decision --> DENIED : limit DECLINED и screening DECLINED"},
+        {"atom": "c", "status": "есть", "quote": "COMPLETED --> [*] … CANCELLED --> [*] … DENIED --> [*]"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K4-S1", "status": "есть", "quote": "Таймаут ожидания результатов в коде не найден. … Если пара результатов не сошлась в окне, перевод остаётся NEW"},
+    {"id": "K4-S2", "status": "есть", "quote": "RESERVED → COMMITTED при итоге COMPLETED, RESERVED → RELEASED при CANCELLED или DENIED; NONE — лимит отклонён, переходов нет."},
+    {"id": "K4-S3", "status": "есть", "quote": "participant TEL as TransferEventListener … Note over SEL: только запись в лог, резервов нет"},
+    {"id": "K4-S4", "status": "есть", "quote": "tel -.-> … transfers.DLT, limit-results.DLT, screening-results.DLT\"| tpDlt … lel -.-> … sel -.-> … KafkaErrorHandlingConfig: transfers.DLT\"| tpDlt"},
+    {"id": "K4-S5", "status": "есть", "quote": "DECIMAL amount \"DECIMAL(15,2), NOT NULL\" … BIGINT sender_id \"NOT NULL, UNIQUE\""},
+    {"id": "K4-S6", "status": "есть", "quote": "sender_usage |o..o{ reservations : \"sender_id, без FK\""},
+    {"id": "K4-S7", "status": "есть", "quote": "decision --> CANCELLED : любые другие статусы результатов, messageInfo = UNEXPECTED_RESULT"}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {
+      "quote": "KafkaListener id=transfer-tracker … KafkaListener id=limit-transfers-listener … KafkaListener id=screening-transfers-listener",
+      "code_ref": "transfer-service TransferEventListener.onEvent; limit-service и screening-service TransferEventsListener.onEvent",
+      "explanation": "Идентификаторы контейнеров слушателей в @KafkaListener(id = ...) совпадают с кодом; в эталоне указаны только consumer group"
+    },
+    {
+      "quote": "`TransferWithHistory` и `Problem` — имена схем из `openapi/transfer-api.yaml`; в Java это `Map` в `TransferController.getById` и `ProblemDetail`",
+      "code_ref": "TransferController.getById (LinkedHashMap с ключами transfer и history); ApiExceptionHandler, TransferController.duplicate (ProblemDetail); transfer-api.yaml, схема Problem",
+      "explanation": "Ответ GET /transfers/{id} собирается как Map, отдельного DTO нет; поля Problem (type, title, status, detail, instance) взяты из OpenAPI верно"
+    },
+    {
+      "quote": "Ответы `POST /transfers` и `GET /transfers` — сериализованный `TransferEntity` (схема `Transfer` в `transfer-api.yaml`); отдельного DTO в коде не найдено.",
+      "code_ref": "TransferController.create, TransferController.all, TransferController.duplicate",
+      "explanation": "Успешные ответы возвращают TransferEntity напрямую (List<TransferEntity> для GET /transfers)"
+    }
+  ],
+  "contamination": [],
+  "notes": "Ошибок, противоречащих коду, не найдено. Сомнительные места, не внесённые в errors: (1) на компонентной диаграмме узел DLT подписан «запись после 3 повторов с интервалом 1 с» без оговорки, что сообщения с ошибкой десериализации уходят в DLT сразу, без повторов; при этом связи к DLT явно подписаны «при ошибке обработки», а о битых сообщениях ответ ничего не утверждает, поэтому это упрощение, а не утверждение «битое сообщение повторяется 3 раза». (2) Кардинальности в ER: transfers ||--o{ transfer_history (0..N, хотя createTransfer всегда пишет историю NEW, эталон 9.4 даёт 1..4 через |{) и sender_usage |o..o{ reservations (сторона reservations 0..N, хотя sender_usage создаётся только вместе с резервом). На уровне схемы БД 0..N допустимо, явного штрафа в эталоне нет; в тексте модель сама пишет «один перевод и до 4 записей истории». (3) В 4г для полей использованы Java-типы; в кейсе 4 промпт требует только «поля с типами» и JSON-типы не предписывает, поэтому нарушением формата не считается. Синтаксис Mermaid не оценивался по инструкции. Расхождений эталона с кодом по проверенным фактам не обнаружено."
+}

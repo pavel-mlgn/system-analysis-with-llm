@@ -1,0 +1,78 @@
+{
+  "case": "04",
+  "answer_id": "K",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfer-service (порт 8080)…limit-service…screening-service"},
+        {"atom": "b", "status": "есть", "quote": "transfer-db<br/>PostgreSQL transferdb…limit-db<br/>PostgreSQL limitdb…screening-db<br/>PostgreSQL screeningdb"},
+        {"atom": "c", "status": "есть", "quote": "Kafka broker — docker-compose.yml…topic transfers…topic limit-results…topic screening-results"},
+        {"atom": "d", "status": "есть", "quote": "HTTP REST: POST /transfers…JPA/JDBC: LimitLedger.decide…Kafka JSON: KafkaTemplate.send(limit-results)"},
+        {"atom": "e", "status": "есть", "quote": "transfersTopic -- \"consume @KafkaListener limit-transfers-listener\" --> limitListener…limitCore -- \"Kafka JSON: KafkaTemplate.send(limit-results)\" --> limitTopic"}
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "TTS->>TDB: save transfers (status NEW) + transfer_history (stage NEW)…TC->>K: KafkaTemplate.send(transfers) - Transfer.status NEW - publishNew…TC-->>Client: 201 Created"},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "есть", "quote": "DS->>TDS: decide(limitResult - screeningResult) в окне 10 с"},
+        {"atom": "d", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "проверка лимита отклоняет перевод (DAILY_LIMIT_EXCEEDED)"},
+        {"atom": "b", "status": "есть", "quote": "резерв уже создан и учтён в дневном расходе"},
+        {"atom": "c", "status": "есть", "quote": "SenderUsage.release - возврат суммы в daily_used и monthly_used…reservation.markReleased - state RELEASED"}
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfer-db (PostgreSQL transferdb)…limit-db (PostgreSQL limitdb)…screening-db (PostgreSQL screeningdb)"},
+        {"atom": "b", "status": "есть", "quote": "transfers ||--o{ transfer_history : \"transfer_id (FK)\""},
+        {"atom": "c", "status": "есть", "quote": "объекты, не хранящиеся в БД (сообщения и запросы)…TransferRequest…Transfer"},
+        {"atom": "d", "status": "есть", "quote": "reservations }o..|| sender_usage : \"sender_id (логическая связь)\"…blocked_senders ||..o{ screening_checks : \"sender_id (логическая связь)\""}
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "[*] --> NEW : TransferTrackingService.createTransfer"},
+        {"atom": "b", "status": "есть", "quote": "NEW --> COMPLETED : TransferDecisionService.decide - limit APPROVED и screening APPROVED…NEW --> CANCELLED : TransferDecisionService.decide - только limit DECLINED…NEW --> DENIED : TransferDecisionService.decide - limit DECLINED и screening DECLINED"},
+        {"atom": "c", "status": "есть", "quote": "COMPLETED --> [*]…DENIED --> [*]…CANCELLED --> [*]"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K4-S1", "status": "есть", "quote": "при выходе результата за окно перевод остаётся в NEW"},
+    {"id": "K4-S2", "status": "нет", "quote": ""},
+    {"id": "K4-S3", "status": "нет", "quote": ""},
+    {"id": "K4-S4", "status": "есть", "quote": "limitListener -. \"DefaultErrorHandler… -> DeadLetterPublishingRecoverer\" .-> dltTransfers…tracker -. \"DefaultErrorHandler… -> DeadLetterPublishingRecoverer\" .-> dltLimit"},
+    {"id": "K4-S5", "status": "нет", "quote": ""},
+    {"id": "K4-S6", "status": "нет", "quote": ""},
+    {"id": "K4-S7", "status": "есть", "quote": "NEW --> CANCELLED : TransferDecisionService.decide - UNEXPECTED_RESULT"}
+  ],
+  "errors": [
+    {
+      "quote": "проверка лимита отклоняет перевод... резерв уже создан и учтён в дневном расходе, поэтому после финального статуса CANCELLED LimitLedger.settle снимает резерв",
+      "category": "искажение",
+      "etalon_ref": "Частые искажения: \"CANCELLED всегда возвращает лимит\" / Сценарий 2",
+      "code_ref": "LimitLedger.decide; LimitLedger.settle",
+      "explanation": "Если лимит отклоняет перевод (DECLINED), резерв не создается (state NONE), счетчик не увеличивается. При settle возвращать ничего не нужно."
+    },
+    {
+      "quote": "Обработка сбоев Kafka Streams внутри decisionStream (конфигурация exception handler для Streams) в коде не найдена",
+      "category": "ложная_аномалия",
+      "etalon_ref": "5.2 Надежность: Kafka Streams... LogAndContinueExceptionHandler",
+      "code_ref": "transfer-service/src/main/resources/application.yml",
+      "explanation": "В application.yml задан default.deserialization.exception.handler: org.apache.kafka.streams.errors.LogAndContinueExceptionHandler"
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Модель формально показала компенсацию на диаграмме 3, поэтому атомы (b) и (c) закрыты, но логика абсурдна: модель компенсирует отказ самого же лимита (за это выписано искажение в errors). На sequence-диаграммах не показана параллельная обработка (par), listener'ы вызываются линейно."
+}

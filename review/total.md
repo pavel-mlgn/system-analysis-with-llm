@@ -2,13 +2,16 @@
 |---|---|---|---|---|---|---|---|
 | Claude Opus 5.5 Max (Claude Code) | 13 | 14,5 | 15 | 14 | 16 | **72,5** | 95% |
 | Claude Opus 5.5 Max | 13 | 15 | 15 | 13 | 16 | **72** | 95% |
+| Claude Fable 5.2 Max | 12 | 15 | 14 | 14 | 17 | **72** | 95% |
 | Claude Opus 5.5 High | 9 | 15 | 13,5 | 14 | 16 | **67,5** | 89% |
 | Gemini 4 Carbon High | 10 | 13 | 10,5 | 14 | 13,5 | **61** | 80% |
 | ChatGPT GPT-5.6 Sol High | 10 | 13 | 12 | 10 | 11 | **56** | 74% |
 | Kimi K3.1 Pro Max | 10 | 13 | 12,5 | 2 | 14 | **51,5** | 68% |
 | Gemini 4 Argon High | 8 | 11 | 10,5 | 10,5 | 11 | **51** | 67% |
+| Алиса AI Эксперт | 8 | 12 | 9 | 4,5 | 10 | **43,5** | 57% |
 | DeepSeek V4.1-Flash DeepThink | 8 | 7 | 10 | 4,5 | 8,5 | **38** | 50% |
 | Gemini 3.1 Pro High | 5,5 | 6 | 4 | 5 | 3 | **23,5** | 31% |
+| GigaChat 3.5 Ultra Reasoning | 5 | -4 | 4 | -8 | -8,5 | **-11,5** | -15% |
 
 **Ошибки за все кейсы**
 
@@ -16,10 +19,13 @@
 |---|---|---|---|---|---|---|---|
 | Claude Opus 5.5 Max (Claude Code) | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Claude Opus 5.5 Max | 1 | 0 | 0 | 0 | 0 | 1 | 0 |
+| Claude Fable 5.2 Max | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
 | Claude Opus 5.5 High | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | Gemini 4 Carbon High | 3 | 0 | 1 | 0 | 0 | 0 | 0 |
 | ChatGPT GPT-5.6 Sol High | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
 | Kimi K3.1 Pro Max | 2 | 3 | 0 | 0 | 1 | 1 | 0 |
 | Gemini 4 Argon High | 4 | 2 | 1 | 0 | 0 | 2 | 0 |
+| Алиса AI Эксперт | 6 | 3 | 1 | 0 | 1 | 1 | 0 |
 | DeepSeek V4.1-Flash DeepThink | 3 | 5 | 4 | 0 | 0 | 1 | 1 |
 | Gemini 3.1 Pro High | 5 | 4 | 4 | 0 | 3 | 3 | 0 |
+| GigaChat 3.5 Ultra Reasoning | 8 | 5 | 7 | 3 | 5 | 4 | 2 |

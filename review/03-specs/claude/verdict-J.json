@@ -1,0 +1,191 @@
+{
+  "case": "03",
+  "answer_id": "J",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "| transfer-service | 3 эндпоинта, базовый путь `/transfers` | … Эндпоинт: POST /transfers … Эндпоинт: GET /transfers … Эндпоинт: GET /transfers/{id}"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "| 201 | Перевода с таким `id` не было … | 200 | Перевод с таким `id` уже существует … | 400 | Нарушены ограничения … | 409 | Перевод с таким `id` … | 503 | Сообщение не удалось опубликовать в Kafka"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "| 200 | Перевод найден | … | 404 | Перевод с указанным `id` не найден"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "| id | body | number (целое, int64) | да (`@NotNull`) | … | currency | body | string | … | history | array | нет |"
+        }
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "transfers, transfer_history … | limitdb | PostgreSQL (тот же образ) | … sender_usage, reservations … | screeningdb | PostgreSQL (тот же образ) | … blocked_senders, screening_checks"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "| amount | DECIMAL(15,2) | нет | нет | нет | да | — | — | Сумма перевода |"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "| transfer_id | BIGINT | да | нет | да (PK) | да (PK) | — | неявный индекс PK | Идентификатор перевода (`Transfer.id` из сообщения); FK не объявлен |"
+        },
+        {
+          "atom": "d",
+          "status": "есть",
+          "quote": "| transfer_id | BIGINT | нет | transfers(id) |"
+        },
+        {
+          "atom": "e",
+          "status": "есть",
+          "quote": "| uq_transfer_history_stage (UNIQUE) | transfer_id, stage |"
+        },
+        {
+          "atom": "f",
+          "status": "есть",
+          "quote": "| sender_id | BIGINT | нет | нет | да | да | — | idx_blocked_senders_sender_id; неявный индекс UNIQUE |"
+        }
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "| Класс | record `com.example.common.Transfer`, модуль transfer-common | … | amount | BigDecimal | нет | Сумма перевода | … | createdAt | LocalDateTime | нет |"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "| transfers | `TransferController.publishNew()` | `NEW` | … | transfers | `TransferDecisionService.decide()` | `DENIED` | … | limit-results | `LimitService.onNewTransfer()` | `DECLINED` |"
+        }
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "Канал: limit-results … Канал: screening-results … | Число партиций | 3 | … | Политика хранения / очистки | `cleanup.policy=compact` (`TopicBuilder.compact()`)"
+        },
+        {
+          "atom": "b",
+          "status": "есть",
+          "quote": "| Ключ сообщения | `Long` — идентификатор перевода (`Transfer.id`) | … | Сериализация значения | JSON. Отправители: `JsonSerializer` (KafkaTemplate)"
+        },
+        {
+          "atom": "c",
+          "status": "есть",
+          "quote": "— группа `limit`; screening-service: `TransferEventsListener.onEvent()` — группа `screening`; transfer-service: `TransferEventListener.onEvent()` — группа `transfer-tracker`"
+        }
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {
+          "atom": "a",
+          "status": "есть",
+          "quote": "| Код ответа 400 для GET /transfers/{id} | Описаны только 200 и 404 |"
+        }
+      ]
+    }
+  ],
+  "strong": [
+    {
+      "id": "K3-S1",
+      "status": "есть",
+      "quote": "| version | BIGINT | нет | нет | нет | да | 0 | — | Версия строки для оптимистической блокировки (`@Version` в `SenderUsage`) |"
+    },
+    {
+      "id": "K3-S2",
+      "status": "есть",
+      "quote": "Идентификатор отправителя; FK на sender_usage не объявлен … Идентификатор перевода (`Transfer.id` из сообщения); FK не объявлен"
+    },
+    {
+      "id": "K3-S3",
+      "status": "есть",
+      "quote": "| Объявление в коде | `KafkaErrorHandlingConfig.limitResultsDlt()` только в transfer-service | … `KafkaErrorHandlingConfig.transfersDlt()` в transfer-service, limit-service, screening-service"
+    },
+    {
+      "id": "K3-S4",
+      "status": "есть",
+      "quote": "| status | String | нет | Статус перевода или решение сервиса; набор значений зависит от канала |"
+    },
+    {
+      "id": "K3-S5",
+      "status": "есть",
+      "quote": "| state | `RESERVED`, `COMMITTED`, `RELEASED`, `NONE` (константы `Reservation`) |"
+    },
+    {
+      "id": "K3-S6",
+      "status": "есть",
+      "quote": "группа равна `application.id` Kafka Streams; `spring.kafka.streams.application-id` в коде не задан, по умолчанию Spring Boot берёт `spring.application.name` = `transfer-service`"
+    },
+    {
+      "id": "K3-S7",
+      "status": "нет",
+      "quote": ""
+    },
+    {
+      "id": "K3-S8",
+      "status": "есть",
+      "quote": "(`spring.json.value.default.type` отсутствует) — тип берётся из заголовков, которые `JsonSerializer` добавляет по умолчанию"
+    },
+    {
+      "id": "K3-S9",
+      "status": "есть",
+      "quote": "при настройках `JsonSerializer` по умолчанию ожидается массив чисел `[2026,11,15,10,15,30,123456000]`"
+    }
+  ],
+  "errors": [
+    {
+      "quote": "| Поле `status` в схемах `Transfer` и `HistoryEntry` | `enum` с фиксированным набором значений | Тип `String` (`TransferEntity.status`, `TransferHistoryEntry.status`)",
+      "category": "ложная_аномалия",
+      "etalon_ref": "6.1 (выдуманные расхождения: enum в контракте против String в коде); K3 специфичные штрафы",
+      "code_ref": "transfer-api.yaml TransferStatus, HistoryEntry.status; TransferEntity.status; TransferHistoryEntry.status; TransferDecisionService.decide",
+      "explanation": "В разделе 4 enum контракта против String в коде вынесен строкой в таблицу расхождений, хотя модель сама пишет, что значения совпадают. Значения, которые формирует код (TransferTrackingService.createTransfer, TransferDecisionService.decide, LimitService/ScreeningService), совпадают с enum контракта. Эталон относит это к выдуманным расхождениям"
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "| Сериализация ключа | `DelegatingByTypeSerializer`: `Long` → `LongSerializer`, `byte[]` → `ByteArraySerializer` |",
+      "code_ref": "KafkaErrorHandlingConfig.keySerializer(), KafkaErrorHandlingConfig.kafkaErrorHandler() (во всех трех сервисах)",
+      "explanation": "DLT-шаблоны: ключ через DelegatingByTypeSerializer (byte[] и Long), значение byte[] через rawTemplate с ByteArraySerializer, остальное через jsonTemplate с new JsonSerializer<>(); партиция = record.partition()"
+    },
+    {
+      "quote": "| decided_by | NULL (этап NEW); `limit` (этап LIMIT); `screening` (этап SCREENING); NULL, `limit`, `screening` (этап FINAL) |",
+      "code_ref": "TransferTrackingService.createTransfer, recordServiceResult, applyFinalStatus; LimitService/ScreeningService.DECIDED_BY; TransferDecisionService.decide",
+      "explanation": "Допустимые значения transfer_history.status и decided_by по этапам верны: NEW пишется с null, LIMIT и SCREENING копируют decidedBy из ответов сервисов, FINAL берет decidedBy из decide (null, limit или screening)"
+    },
+    {
+      "quote": "`id`, `senderId`, `recipientId`, `amount`, `currency`, `createdAt` переносятся из исходного сообщения без изменений (`Transfer.withDecision()`)",
+      "code_ref": "transfer-common Transfer.withDecision",
+      "explanation": "withDecision создает новый record с прежними id, senderId, recipientId, amount, currency, createdAt и меняет только status, decidedBy, messageInfo"
+    },
+    {
+      "quote": "409: «Перевод с id=N уже существует с другими параметрами»; 503: «Kafka недоступна, перевод сохранён — повторите запрос с тем же id»; 500: «Внутренняя ошибка сервера, повторите запрос позже»",
+      "code_ref": "TransferController.duplicate, TransferController.KAFKA_UNAVAILABLE, ApiExceptionHandler.INTERNAL_ERROR",
+      "explanation": "Тексты detail в ProblemDetail для 409, 503 и 500 переданы дословно по коду"
+    }
+  ],
+  "contamination": [],
+  "notes": "Раздел 4: кроме O1 (500) и O2 (400 для GET /{id}) модель пишет, что схемы TransferRequest и Transfer \"Соответствуют коду\", и пропускает O4–O8. Например, O8 (multipleOf: 0.01 против @Digits(fraction = 2)) и O7 (updatedAt в контракте не nullable, хотя в разделе 1 модель сама отмечает, что колонка допускает NULL). Это пропуск, а не ложное утверждение, поэтому в errors не записано, но K3-S7 не засчитан: из O2–O8 найдено только O2. Строка про enum/String включена в errors по прямому указанию эталона 6.1. В ней есть верное по коду наблюдение: TransferTrackingService.applyFinalStatus и recordServiceResult копируют status из Kafka без проверки. K3-S8: имя __TypeId__ не названо, но механизм описан верно (тип из заголовка JsonSerializer, spring.json.value.default.type не задан). Утверждение сделано с оговоркой \"требует уточнения\", засчитано по смыслу. K3-S2: для limitdb явно сказано \"FK на sender_usage не объявлен\". Для screeningdb явного слова о логической связи blocked_senders и screening_checks нет, только FK = нет в таблице. Засчитано по ядру пункта. Формат: вводная фраза, строки \"**Источник:**\" перед таблицами и финальная фраза о Claude Docs формально нарушают правило \"никакой прозы между таблицами\". Это короткие служебные строки, и с учетом сомнения в errors они не записаны. Java-типов в HTTP-таблицах нет: LocalDateTime упоминается только в описании, тип указан string. Расхождений эталона с кодом не обнаружено. Маркеров контаминации нет."
+}

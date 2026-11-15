@@ -14,6 +14,9 @@ NAMES = {
     "kimi-k3.1-pro-max": "Kimi K3.1 Pro Max",
     "claude-opus-5.5-max-claude-code": "Claude Opus 5.5 Max (Claude Code)",
     "gemini-4-carbon-high": "Gemini 4 Carbon High",
+    "claude-fable-5.2-max": "Claude Fable 5.2 Max",
+    "alice-ai-expert": "Алиса AI Эксперт",
+    "gigachat-3.5-ultra-reasoning": "GigaChat 3.5 Ultra Reasoning",
 }
 CASES = ["01-recon", "02-business-logic", "03-specs", "04-diagrams", "05-change-request"]
 

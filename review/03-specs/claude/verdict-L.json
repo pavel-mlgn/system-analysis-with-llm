@@ -1,0 +1,104 @@
+{
+  "case": "03",
+  "answer_id": "L",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "### POST /transfers … ### GET /transfers … ### GET /transfers/{id}"},
+        {"atom": "b", "status": "есть", "quote": "| 201 | Перевод создан | … | 200 | Перевод уже существует с теми же параметрами | … | 400 | Ошибка валидации | … | 409 | Конфликт параметров … | 503 | Kafka недоступна |"},
+        {"atom": "c", "status": "есть", "quote": "### GET /transfers/{id} … | 200 | OK | … | 404 | Перевод не найден |"},
+        {"atom": "d", "status": "есть", "quote": "| id | body | integer (int64) | да | Идентификатор перевода | … | amount | body | number (decimal) | да | Сумма | … | createdAt | string (date-time) | нет | Дата создания |"}
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "### transfer-db: transfers … ### transfer-db: transfer_history … ### limit-db: sender_usage … ### limit-db: reservations … ### screening-db: blocked_senders … ### screening-db: screening_checks"},
+        {"atom": "b", "status": "есть", "quote": "| amount | DECIMAL(15,2) | нет | нет | нет | да | нет | нет | Сумма |"},
+        {"atom": "c", "status": "есть", "quote": "### limit-db: reservations … | transfer_id | BIGINT | да | нет | нет | да | нет | нет | ID перевода | … ### screening-db: screening_checks … | transfer_id | BIGINT | да |"},
+        {"atom": "d", "status": "есть", "quote": "| transfer_id | BIGINT | нет | да (transfers.id) | нет | да | нет | idx_transfer_history_transfer_id | ID перевода |"},
+        {"atom": "e", "status": "есть", "quote": "| uq_transfer_history_stage | transfer_id, stage |"},
+        {"atom": "f", "status": "есть", "quote": "| sender_id | BIGINT | нет | нет | да | да | нет | idx_blocked_senders_sender_id | ID отправителя |"}
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "| id | Long | нет | Идентификатор перевода | 12345 | … | amount | BigDecimal | нет | Сумма | 5000.00 | … | createdAt | LocalDateTime | нет | Дата создания |"},
+        {"atom": "b", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "### Канал: transfers … | Partitions | 3 | … | Cleanup policy | compact | … ### Канал: limit-results … ### Канал: screening-results"},
+        {"atom": "b", "status": "есть", "quote": "| Key | Long (transfer id) | … | Value | Transfer (JSON) |"},
+        {"atom": "c", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Расхождений нет. Файл контракта `openapi/transfer-api.yaml` полностью соответствует коду."}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K3-S1", "status": "есть", "quote": "| version | BIGINT | нет | нет | нет | да | 0 | нет | Версия |"},
+    {"id": "K3-S2", "status": "нет", "quote": ""},
+    {"id": "K3-S3", "status": "нет", "quote": ""},
+    {"id": "K3-S4", "status": "нет", "quote": ""},
+    {"id": "K3-S5", "status": "нет", "quote": ""},
+    {"id": "K3-S6", "status": "нет", "quote": ""},
+    {"id": "K3-S7", "status": "нет", "quote": ""},
+    {"id": "K3-S8", "status": "нет", "quote": ""},
+    {"id": "K3-S9", "status": "нет", "quote": ""}
+  ],
+  "errors": [
+    {
+      "quote": "### Канал: limit-results.DLT … | Отправители | limit-service | … ### Канал: screening-results.DLT … | Отправители | screening-service |",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "раздел 1 (каналы), 5.1; раздел 8 (Частые искажения: *-results.DLT); K3 специфичные штрафы",
+      "code_ref": "transfer-service KafkaErrorHandlingConfig.limitResultsDlt/screeningResultsDlt/kafkaErrorHandler; transfer-service TransferEventListener.onEvent; limit-service и screening-service KafkaErrorHandlingConfig (только transfersDlt), TransferEventsListener.onEvent (topics = \"transfers\")",
+      "explanation": "Топики limit-results.DLT и screening-results.DLT объявляет только transfer-service, и пишет в них только его обработчик ошибок трекера (DLT = топик потреблённой записи + \".DLT\"). limit-service и screening-service не потребляют свои топики ответов, их обработчики пишут только в transfers.DLT"
+    },
+    {
+      "quote": "| id | BIGINT | да | нет | нет | да | нет | idx_transfers_sender_id, idx_transfers_status | Идентификатор перевода |",
+      "category": "неточность",
+      "etalon_ref": "4.1, 4.3",
+      "code_ref": "transfer-service db/changelog/001-create-tables.sql (CREATE INDEX idx_transfers_sender_id ON transfers(sender_id), idx_transfers_status ON transfers(status), idx_transfer_history_transfer_id ON transfer_history(transfer_id)); screening-service db/changelog/001-create-tables.sql (idx_blocked_senders_sender_id ON blocked_senders(sender_id))",
+      "explanation": "В колонке Index для PK id указаны индексы, построенные по другим колонкам. Та же ошибка повторена в transfer_history.id (idx_transfer_history_transfer_id) и blocked_senders.id (idx_blocked_senders_sender_id). На своих колонках эти индексы указаны верно, поэтому это неточность, а не ошибка схемы"
+    },
+    {
+      "quote": "| daily_used | DECIMAL(15,2) | нет | нет | нет | да | 0 | нет | Дневной лимит |",
+      "category": "неточность",
+      "etalon_ref": "4.2; 2.3 L4–L6, L9",
+      "code_ref": "limit-service SenderUsage.reserve/release/lazyReset; LimitLedger.decide (@Value limits.daily-max, limits.monthly-max); application.yml limits",
+      "explanation": "daily_used и monthly_used хранят израсходованную за день и месяц сумму, а не лимит. Лимиты (50 000.00 и 200 000.00) общие для всех и задаются в application.yml. Так же описан monthly_used (\"Месячный лимит\")"
+    },
+    {
+      "quote": "| messageInfo | String | да | Сообщение | APPROVED |",
+      "category": "неточность",
+      "etalon_ref": "4.4",
+      "code_ref": "limit-service Reservation.approve (reason = null), LimitService.onNewTransfer; screening-service ScreeningJournal.check (reason null при APPROVED); transfer-service TransferDecisionService.decide (COMPLETED с messageInfo = null)",
+      "explanation": "APPROVED - значение поля status, в messageInfo оно никогда не попадает. messageInfo содержит null, коды причин (DAILY_LIMIT_EXCEEDED, MONTHLY_LIMIT_EXCEEDED, INVALID_AMOUNT, SENDER_BLOCKED), склейку \"<a>; <b>\" или UNEXPECTED_RESULT: …"
+    },
+    {
+      "quote": "| createdAt | LocalDateTime | нет | Дата создания | 2024-01-15T10:30:00 |",
+      "category": "неточность",
+      "etalon_ref": "4.4; раздел 8 (Частые искажения: createdAt в Kafka - ISO-строка)",
+      "code_ref": "application.yml всех сервисов (spring.kafka.producer.value-serializer: JsonSerializer по имени класса); transfer-service DecisionTopologyConfig (new JsonSerde<>(Transfer.class)); KafkaErrorHandlingConfig (new JsonSerializer<>())",
+      "explanation": "Сериализаторы созданы по имени класса или через new, поэтому используют собственный ObjectMapper spring-kafka, а не настроенный Spring Boot. LocalDateTime пишется в Kafka массивом [год, месяц, день, час, мин, сек, нано], а не ISO-строкой"
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "| Сериализация ключа | LongSerializer / ByteArraySerializer | … | Сериализация значения | JsonSerializer / ByteArraySerializer |",
+      "code_ref": "KafkaErrorHandlingConfig.keySerializer (DelegatingByTypeSerializer: byte[] -> ByteArraySerializer, Long -> LongSerializer); kafkaErrorHandler (шаблоны по типу значения: byte[] -> ByteArraySerializer, Object -> JsonSerializer)",
+      "explanation": "Сериализация DLT-сообщений описана верно: ключ и значение выбираются по типу, битые записи уходят исходными байтами, остальные - JSON"
+    }
+  ],
+  "contamination": [],
+  "notes": "K3-M4(c) не засчитан: группы потребителей указаны только для transfers (limit, screening, transfer-tracker - верно). Для limit-results и screening-results получатель указан как \"transfer-service (DecisionTopology)\", без группы и без трекера (группа transfer-tracker тоже читает оба топика, TransferEventListener). Это неполнота, в errors не записана. K3-S1 засчитан по колонке version в sender_usage; оптимистическая блокировка не названа. K3-S2 не засчитан: в колонке FK стоит \"нет\", но не сказано, что связи логические. K3-S3 не засчитан из-за неверных продюсеров *-results.DLT (см. errors); кто объявляет DLT, не указано. K3-M3(b), K3-S4, K3-S5 не закрыты: ответ не содержит ни одной таблицы \"Допустимые значения\", хотя промпт её требует. В разделе 4 сказано, что контракт полностью соответствует коду, хотя реальные расхождения есть (O1 500, O2 400 для GET /{id}, O4 формат дат, O5 нет required, O6 currency null, O8 multipleOf против @Digits). По K3-M5 явное \"расхождений нет\" засчитывается, поэтому в errors не записано, но K3-S7 не закрыт. Отклонения формата не записаны в errors: у эндпоинтов и таблиц нет строки \"Описание\"; базы названы именами сервисов docker-compose (transfer-db, limit-db, screening-db), а фактические имена БД - transferdb, limitdb, screeningdb; прозаическая строка \"Нет параметров запроса.\" в разделе 1 (исключение для одной строки есть только в разделах 3 и 4); в разделе 4 после строки \"Расхождений нет\" всё равно дана таблица. Тип \"string (date-time)\" в HTTP для LocalDateTime без смещения формально не соответствует RFC 3339, в контракте формат не задан (O4); в errors не записано. Расхождений эталона с кодом не обнаружено."
+}

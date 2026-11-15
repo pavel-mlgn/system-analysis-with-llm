@@ -1,0 +1,74 @@
+{
+  "case": "01",
+  "answer_id": "K",
+  "mandatory": [
+    {
+      "id": "K1-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Система обработки денежных переводов: клиент создаёт перевод через REST API"},
+        {"atom": "b", "status": "есть", "quote": "проверками — лимитами отправителя (дневной и месячный потолок трат)"},
+        {"atom": "c", "status": "есть", "quote": "скринингом (блок-листы отправителей)"},
+        {"atom": "d", "status": "есть", "quote": "после чего итоговый статус и вся история проверки сохраняются в базе… transfer-service соединяет результаты stream-join'ом"}
+      ]
+    },
+    {
+      "id": "K1-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "обмениваются сообщениями только через Kafka, без прямых вызовов друг друга"},
+        {"atom": "b", "status": "есть", "quote": "limit-service и screening-service независимо проверяют его и публикуют результаты"},
+        {"atom": "c", "status": "есть", "quote": "transfer-service соединяет результаты stream-join'ом (Kafka Streams) в итоговое решение"}
+      ]
+    },
+    {
+      "id": "K1-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "| transfer-common | библиотека… | transfer-service | сервис… | limit-service | сервис… | screening-service | сервис"},
+        {"atom": "b", "status": "есть", "quote": "| transfer-common | библиотека | нет | Общая модель события Transfer"},
+        {"atom": "c", "status": "есть", "quote": "transfer-service… есть (REST /transfers… limit-service… нет… screening-service… нет"}
+      ]
+    },
+    {
+      "id": "K1-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Java 21"},
+        {"atom": "b", "status": "есть", "quote": "Spring Boot 3.4.1"},
+        {"atom": "c", "status": "есть", "quote": "Spring Kafka и Kafka Streams"},
+        {"atom": "d", "status": "есть", "quote": "PostgreSQL JDBC driver, Liquibase"}
+      ]
+    },
+    {
+      "id": "K1-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfer-service: публикует NEW… Получатели: limit-service (группа limit), screening-service (группа screening), transfer-service (группа transfer-tracker)"},
+        {"atom": "b", "status": "есть", "quote": "limit-results | limit-service… transfer-service: Kafka Streams join… и трекер… screening-results | screening-service… transfer-service: аналогично"}
+      ]
+    },
+    {
+      "id": "K1-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Kafka — confluentinc/cp-kafka:7.6.0"},
+        {"atom": "b", "status": "есть", "quote": "PostgreSQL — postgres:16-alpine, три отдельных экземпляра, по одному на сервис"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K1-S1", "status": "нет", "quote": ""},
+    {"id": "K1-S2", "status": "нет", "quote": ""},
+    {"id": "K1-S3", "status": "есть", "quote": "автосоздание топиков отключено, 3 топика создаются кодом (TopicsConfig каждого сервиса)"},
+    {"id": "K1-S4", "status": "нет", "quote": ""},
+    {"id": "K1-S5", "status": "нет", "quote": ""},
+    {"id": "K1-S6", "status": "есть", "quote": "KRaft-режим (без ZooKeeper)… transferdb (порт 5434), limitdb (5432), screeningdb (5433)"}
+  ],
+  "errors": [
+    {
+      "quote": "transfers.DLT, limit-results.DLT, screening-results.DLT | DeadLetterPublishingRecoverer (3 копии KafkaErrorHandlingConfig — по одной в каждом сервисе)",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "Раздел 5.1; Раздел 11 (Кейс 3, специфичные штрафы)",
+      "code_ref": "limit-service/config/KafkaErrorHandlingConfig.java; transfer-service/config/KafkaErrorHandlingConfig.java",
+      "explanation": "Топики limit-results.DLT и screening-results.DLT объявляются только в transfer-service, а не во всех трех сервисах (в остальных только transfers.DLT)."
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Модель жалуется, что «Файл обрезался на transfer-service» и «контроллер в файле виден частично», что является ложным впечатлением (возможно, сработал лимит контекста на этапе генерации или галлюцинация), но сам код прочитан и описан довольно полно."
+}

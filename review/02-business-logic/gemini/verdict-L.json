@@ -1,0 +1,125 @@
+{
+  "case": "02",
+  "answer_id": "L",
+  "mandatory": [
+    {
+      "id": "K2-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "HTTP POST запрос на `/transfers` от внешнего клиента"},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "есть", "quote": "Kafka Consumer (transfer-service): сборка финального решения… Записать результат сервиса в историю"},
+        {"atom": "d", "status": "есть", "quote": "Kafka Streams: объединение результатов… Поток из `limit-results` соединяется с потоком из `screening-results`"},
+        {"atom": "e", "status": "есть", "quote": "Kafka Consumer (limit-service): обработка новых переводов… Если статус — `NEW`… Иначе (финальный статус) — вызвать `ledger.settle(transfer)`"},
+        {"atom": "f", "status": "есть", "quote": "Kafka Consumer (screening-service): проверка отправителя… Сообщение из топика `transfers` со статусом `NEW`"}
+      ]
+    },
+    {
+      "id": "K2-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "APPROVED | APPROVED | COMPLETED"},
+        {"atom": "b", "status": "есть", "quote": "APPROVED | DECLINED | CANCELLED | screening"},
+        {"atom": "c", "status": "есть", "quote": "DECLINED | APPROVED | CANCELLED | limit"},
+        {"atom": "d", "status": "есть", "quote": "DECLINED | DECLINED | DENIED | null | limit + \"; \" + screening"}
+      ]
+    },
+    {
+      "id": "K2-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Дневной лимит — 50 000 на отправителя.… Месячный лимит — 200 000 на отправителя."},
+        {"atom": "b", "status": "есть", "quote": "Проверить: `dailyUsed + amount <= dailyMax` (50 000).… Проверить: `monthlyUsed + amount <= monthlyMax` (200 000)."},
+        {"atom": "c", "status": "есть", "quote": "`dailyUsed + amount <= dailyMax`"},
+        {"atom": "d", "status": "есть", "quote": "При новом дне/месяце счётчики обнуляются (lazy reset)."},
+        {"atom": "e", "status": "есть", "quote": "Сумма <= 0 — автоматический `DECLINED` с причиной `INVALID_AMOUNT`."}
+      ]
+    },
+    {
+      "id": "K2-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Если лимит не превышен — зарезервировать сумму, `APPROVED`"},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "нет", "quote": ""},
+        {"atom": "d", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K2-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Проверить `blocked_senders` по senderId."},
+        {"atom": "b", "status": "есть", "quote": "Если отправитель заблокирован — `DECLINED` с причиной `SENDER_BLOCKED`."},
+        {"atom": "c", "status": "есть", "quote": "Иначе — игнорировать (screening не хранит резервы)… screening не обрабатывает финальные статусы"}
+      ]
+    },
+    {
+      "id": "K2-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "`201 Created` — перевод создан.… `200 OK` — перевод уже существовал, возвращён.… `409 Conflict` — конфликт параметров."},
+        {"atom": "b", "status": "есть", "quote": "Повторная обработка того же перевода — возвращать сохранённое решение… Повторная проверка — возвращать сохранённый результат."},
+        {"atom": "c", "status": "есть", "quote": "Результаты сервисов (limit/screening) — записываются однократно (по стадии)."}
+      ]
+    },
+    {
+      "id": "K2-M7",
+      "atoms": [
+        {"atom": "a", "status": "нет", "quote": ""}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K2-S1", "status": "нет", "quote": ""},
+    {"id": "K2-S2", "status": "нет", "quote": ""},
+    {"id": "K2-S3", "status": "нет", "quote": ""},
+    {"id": "K2-S4", "status": "нет", "quote": ""},
+    {"id": "K2-S5", "status": "нет", "quote": ""},
+    {"id": "K2-S6", "status": "нет", "quote": ""},
+    {"id": "K2-S7", "status": "есть", "quote": "*любой | *любой (не описан выше) | CANCELLED | null | UNEXPECTED_RESULT"},
+    {"id": "K2-S8", "status": "нет", "quote": ""},
+    {"id": "K2-S9", "status": "нет", "quote": ""}
+  ],
+  "errors": [
+    {
+      "quote": "Нет блокировки при amount == null в decide()",
+      "category": "ложная_аномалия",
+      "etalon_ref": "L3",
+      "code_ref": "limit-service LimitLedger.decide",
+      "explanation": "amount == null корректно обрабатывается в первой же проверке: if (amount == null || amount.signum() <= 0)"
+    },
+    {
+      "quote": "SenderUsage.reserve() вызывается до проверки лимитов... счётчик увеличивается даже при отказе... внутри блока else",
+      "category": "ложная_аномалия",
+      "etalon_ref": "L6",
+      "code_ref": "limit-service LimitLedger.decide",
+      "explanation": "reserve() вызывается внутри блока else, который выполняется только если лимиты НЕ превышены, при отказе он не увеличивается"
+    },
+    {
+      "quote": "lazyReset не вызывается при release() если reservedOn != today",
+      "category": "ложная_аномалия",
+      "etalon_ref": "L13",
+      "code_ref": "limit-service SenderUsage.release",
+      "explanation": "lazyReset(today) вызывается безусловно первой строкой метода release()"
+    },
+    {
+      "quote": "transferRepository.saveAndFlush() + historyRepository.save() не атомарны",
+      "category": "ложная_аномалия",
+      "etalon_ref": "T3",
+      "code_ref": "transfer-service TransferTrackingService.createTransfer",
+      "explanation": "Метод createTransfer помечен аннотацией @Transactional, поэтому сохранение атомарно в рамках одной транзакции"
+    },
+    {
+      "quote": "Нет индекса на reservations.state... Поиск активных резервов (isReserved) Full scan",
+      "category": "ложная_аномалия",
+      "etalon_ref": "раздел 4.2",
+      "code_ref": "limit-service LimitLedger.settle",
+      "explanation": "В коде нет поиска по состоянию isReserved в БД; резервы ищутся только по transferId (PK)"
+    },
+    {
+      "quote": "createdAt в TransferEntity не уникален. Два перевода с одинаковым ID — разные даты. Нарушение контракта (ID — PK)",
+      "category": "ложная_аномалия",
+      "etalon_ref": "раздел 4.1",
+      "code_ref": "transfer-service TransferEntity",
+      "explanation": "id является первичным ключом, создать в БД два разных перевода с одинаковым id невозможно"
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Модель выдумала большое количество ложных аномалий, неверно прочитав простейшие конструкции if-else и не заметив аннотации @Transactional."
+}

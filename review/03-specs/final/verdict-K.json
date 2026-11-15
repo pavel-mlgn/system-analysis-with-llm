@@ -1,0 +1,83 @@
+{
+  "case": "03",
+  "answer_id": "K",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Эндпоинт: POST /transfers … Эндпоинт: GET /transfers … Эндпоинт: GET /transfers/{id}"},
+        {"atom": "b", "status": "есть", "quote": "201 | Перевод создан и опубликован в Kafka … 200 | Дубликат с теми же параметрами … 409 | Дубликат id с другими параметрами … 400 | Ошибка валидации тела запроса … 503 | Ошибка публикации в Kafka"},
+        {"atom": "c", "status": "есть", "quote": "| 200 | Перевод найден | … | 404 | Перевод не найден"},
+        {"atom": "d", "status": "есть", "quote": "| id | body | integer (int64) | … | amount | body | number (decimal) | … | currency | string | нет | Валюта | … | createdAt | string (ISO-8601) | нет |"}
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfers (база: transferdb) … transfer_history (база: transferdb) … sender_usage (база: limitdb) … reservations (база: limitdb) … blocked_senders (база: screeningdb) … screening_checks"},
+        {"atom": "b", "status": "есть", "quote": "| amount | DECIMAL(15,2) | нет | нет | нет | да | нет | нет | Сумма перевода |"},
+        {"atom": "c", "status": "есть", "quote": "Таблица: reservations (база: limitdb) … | transfer_id | BIGINT | да | нет | да (PK) | … Таблица: screening_checks (база: screeningdb)"},
+        {"atom": "d", "status": "есть", "quote": "| transfer_id | BIGINT | нет | да → transfers(id) |"},
+        {"atom": "e", "status": "есть", "quote": "| uq_transfer_history_stage (UNIQUE) | transfer_id, stage |"},
+        {"atom": "f", "status": "есть", "quote": "| sender_id | BIGINT | нет | нет | да (UNIQUE) | да | нет | да (idx_blocked_senders_sender_id) |"}
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "id | Long … senderId | Long … recipientId | Long … amount | BigDecimal … currency | String … status | String … decidedBy | String … messageInfo | String … createdAt | LocalDateTime"},
+        {"atom": "b", "status": "есть", "quote": "| status | String | нет | Статус/решение: NEW, APPROVED, DECLINED, COMPLETED, CANCELLED, DENIED |"}
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Канал: transfers … Канал: limit-results … Канал: screening-results … | Число партиций | 3 | … | Политика хранения / очистки | compact |"},
+        {"atom": "b", "status": "есть", "quote": "| Ключ сообщения | transferId (Long) | … | Сериализация значения | JsonSerializer / JsonDeserializer"},
+        {"atom": "c", "status": "есть", "quote": "transfer-service (TransferController.publishNew) … limit-service (groupId: limit … screening-service (groupId: screening … (groupId: transfer-tracker … limit-service (LimitService.sendAndWait)"}
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "| Все три эндпоинта — ответ 500 | В контракте не описан | … | Transfer.createdAt / Transfer.updatedAt / HistoryEntry.changedAt | type: string (без format) |"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K3-S1", "status": "есть", "quote": "| version | BIGINT | нет | нет | нет | да | 0 | нет | Версия записи (JPA optimistic locking, `@Version`) |"},
+    {"id": "K3-S2", "status": "нет", "quote": ""},
+    {"id": "K3-S3", "status": "есть", "quote": "создаётся в KafkaErrorHandlingConfig limit-service, screening-service и transfer-service … создаётся только в KafkaErrorHandlingConfig transfer-service"},
+    {"id": "K3-S4", "status": "нет", "quote": ""},
+    {"id": "K3-S5", "status": "есть", "quote": "| state | RESERVED, COMMITTED, RELEASED, NONE |"},
+    {"id": "K3-S6", "status": "нет", "quote": ""},
+    {"id": "K3-S7", "status": "нет", "quote": ""},
+    {"id": "K3-S8", "status": "нет", "quote": ""},
+    {"id": "K3-S9", "status": "нет", "quote": ""}
+  ],
+  "errors": [
+    {
+      "quote": "| createdAt | LocalDateTime | нет | Время создания перевода | \"2026-11-15T19:03:34\" |",
+      "category": "неточность",
+      "etalon_ref": "4.4; раздел 8 (Частые искажения: createdAt в Kafka - ISO-строка)",
+      "code_ref": "application.yml всех сервисов (value-serializer JsonSerializer по имени класса); DecisionTopologyConfig.decisionStream (new JsonSerde<>(Transfer.class)); KafkaErrorHandlingConfig.kafkaErrorHandler (new JsonSerializer<>())",
+      "explanation": "JsonSerializer/JsonSerde используют собственный ObjectMapper spring-kafka, а не настроенный Spring Boot, поэтому LocalDateTime в Kafka пишется массивом [год, месяц, день, час, мин, сек, нано], а не ISO-строкой; пример в формате сообщения неверен"
+    },
+    {
+      "quote": "| Сериализация значения | DelegatingByTypeSerializer: byte[] → ByteArraySerializer, Object → JsonSerializer |",
+      "category": "неточность",
+      "etalon_ref": "5.2; F-4",
+      "code_ref": "KafkaErrorHandlingConfig.kafkaErrorHandler и KafkaErrorHandlingConfig.keySerializer (limit-service, screening-service, transfer-service)",
+      "explanation": "DelegatingByTypeSerializer в коде используется только для ключа (keySerializer). Значение выбирается иначе: DeadLetterPublishingRecoverer получает карту шаблонов по типу значения (byte[] -> rawTemplate с ByteArraySerializer, Object -> jsonTemplate с JsonSerializer). Суть (сырые байты или JSON) верна, механизм указан неверно"
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "| Сериализация ключа | DelegatingByTypeSerializer: byte[] → ByteArraySerializer, Long → LongSerializer |",
+      "code_ref": "KafkaErrorHandlingConfig.keySerializer (во всех трех сервисах)",
+      "explanation": "Ключ DLT-сообщений сериализуется DelegatingByTypeSerializer: byte[] (не десериализованный ключ) пишется как есть, Long - через LongSerializer. В эталоне сериализация ключа DLT не описана"
+    }
+  ],
+  "contamination": [],
+  "notes": "K3-M1(d): типы в HTTP-таблицах JSON (integer, number, string, object, array), имена Java-классов даны в скобках как ссылки; нарушением формата не считалось. K3-M4(c): у получателей limit-results/screening-results указаны Kafka Streams без группы и трекер с группой transfer-tracker; группы transfers указаны полностью. K3-S2 не засчитан: в колонке FK у таблиц limitdb и screeningdb стоит \"нет\", но явного утверждения о логических связях нет. K3-S4 не засчитан: значения status даны одним общим списком, без разделения по каналам. K3-S6 не засчитан: группа (application.id) Kafka Streams не названа. K3-S7 не засчитан: из O2-O8 есть только O4 (формат дат); O1 (500) в зачет не идет. Строки про HistoryEntry.stage и 400 в таблице раздела 4 прямо помечены как не расхождения, выдуманными не считались. Итоговая фраза раздела 4 о том, что ограничения amount и currency расхождений не имеют, пропускает O8 (multipleOf 0.01 против @Digits fraction=2) и O6 (currency: null принимается, nullable в контракте нет). Это пропуск, а не утверждение, противоречащее коду: в errors не записано. Отправитель transfers.DLT описан как DeadLetterPublishingRecoverer \"при исчерпании повторов\"; путь сразу в DLT без повторов для не десериализуемых сообщений не упомянут. Утверждение, что сообщения повторяются, не сделано, поэтому это упрощение отнесено в notes, а не в errors. Небольшие отступления от правила \"без прозы между таблицами\" (строка \"Файл контракта: ...\" и итоговая фраза после таблицы раздела 4) в errors не записаны. Пропуски, не являющиеся ошибками: 400 для GET /transfers/{id} при нечисловом id, заголовок __TypeId__. Расхождений эталона с кодом по проверенным пунктам не обнаружено. Ручная сверка: K3-S2 — нет (Gemini засчитал по колонкам FK «нет» и индексам sender_id; явного вывода, что связи внутри limitdb и screeningdb логические, нет). Так же решено для ответов A, B, D, G, H и I кейса 3. Неточность по createdAt (ISO-строка в Kafka) нашли оба, записана один раз; так же решено для ответов E, F и I кейса 3. Неточность по сериализации значения DLT нашел только Claude, подтверждена: DelegatingByTypeSerializer в KafkaErrorHandlingConfig строится только для ключа (keySerializer), значение выбирается картой шаблонов DeadLetterPublishingRecoverer (byte[] -> rawTemplate с ByteArraySerializer, Object -> jsonTemplate с JsonSerializer)."
+}

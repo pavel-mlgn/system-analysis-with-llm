@@ -1,0 +1,166 @@
+{
+  "case": "02",
+  "answer_id": "L",
+  "mandatory": [
+    {
+      "id": "K2-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "`TransferController.create(TransferRequest)` … HTTP POST запрос на `/transfers`"},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "есть", "quote": "`TransferEventListener.onEvent(Transfer, topic)` … Записать результат сервиса в историю (`recordServiceResult`)."},
+        {"atom": "d", "status": "есть", "quote": "`DecisionTopologyConfig.decisionStream` … Поток из `limit-results` соединяется с потоком из `screening-results` по `transferId`."},
+        {"atom": "e", "status": "есть", "quote": "Если статус — `NEW`: … Иначе (финальный статус) — вызвать `ledger.settle(transfer)`."},
+        {"atom": "f", "status": "есть", "quote": "Kafka Consumer (screening-service): проверка отправителя"}
+      ]
+    },
+    {
+      "id": "K2-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "| APPROVED | APPROVED | COMPLETED | null | — |"},
+        {"atom": "b", "status": "есть", "quote": "| APPROVED | DECLINED | CANCELLED | screening | screeningResult.messageInfo() |"},
+        {"atom": "c", "status": "есть", "quote": "| DECLINED | APPROVED | CANCELLED | limit | limitResult.messageInfo() |"},
+        {"atom": "d", "status": "есть", "quote": "| DECLINED | DECLINED | DENIED | null | limit + \"; \" + screening |"}
+      ]
+    },
+    {
+      "id": "K2-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Дневной лимит — 50 000 на отправителя. … Месячный лимит — 200 000 на отправителя."},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "есть", "quote": "Проверить: `dailyUsed + amount <= dailyMax` (50 000). … | dailyUsed + amount > dailyMax | DECLINED | DAILY_LIMIT_EXCEEDED |"},
+        {"atom": "d", "status": "есть", "quote": "При новом дне/месяце счётчики обнуляются (lazy reset)."},
+        {"atom": "e", "status": "есть", "quote": "Сумма <= 0 — автоматический `DECLINED` с причиной `INVALID_AMOUNT`."}
+      ]
+    },
+    {
+      "id": "K2-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Если лимит не превышен — зарезервировать сумму, `APPROVED`."},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "нет", "quote": ""},
+        {"atom": "d", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K2-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Проверить `blocked_senders` по senderId. … Иначе — `APPROVED`."},
+        {"atom": "b", "status": "есть", "quote": "Если отправитель заблокирован — `DECLINED` с причиной `SENDER_BLOCKED`."},
+        {"atom": "c", "status": "есть", "quote": "Иначе — игнорировать (screening не хранит резервы)."}
+      ]
+    },
+    {
+      "id": "K2-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "`201 Created` — перевод создан. … `200 OK` — перевод уже существовал, возвращён. … `409 Conflict` — конфликт параметров."},
+        {"atom": "b", "status": "есть", "quote": "Повторная обработка того же перевода — возвращать сохранённое решение (резервирование идемпотентно). … Повторная проверка — возвращать сохранённый результат."},
+        {"atom": "c", "status": "есть", "quote": "Результаты сервисов (limit/screening) — записываются однократно (по стадии). … Финальный статус применяется однократно (контроль по `FINAL` стадии)."}
+      ]
+    },
+    {
+      "id": "K2-M7",
+      "atoms": [
+        {"atom": "a", "status": "нет", "quote": ""}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K2-S1", "status": "нет", "quote": ""},
+    {"id": "K2-S2", "status": "нет", "quote": ""},
+    {"id": "K2-S3", "status": "нет", "quote": ""},
+    {"id": "K2-S4", "status": "нет", "quote": ""},
+    {"id": "K2-S5", "status": "нет", "quote": ""},
+    {"id": "K2-S6", "status": "нет", "quote": ""},
+    {"id": "K2-S7", "status": "есть", "quote": "Неизвестная комбинация — `CANCELLED` с флагом `UNEXPECTED_RESULT`."},
+    {"id": "K2-S8", "status": "нет", "quote": ""},
+    {"id": "K2-S9", "status": "нет", "quote": ""}
+  ],
+  "errors": [
+    {
+      "quote": "Нет блокировки при `amount == null` в `decide()` | Передача null суммы (невозможно при валидации, но если обойти) | NullPointerException, перевод не обработан",
+      "category": "ложная_аномалия",
+      "etalon_ref": "L3",
+      "code_ref": "limit-service LimitLedger.decide",
+      "explanation": "В коде есть проверка `if (amount == null || amount.signum() <= 0)`: null-сумма дает DECLINED INVALID_AMOUNT, NPE не возникает. Ответ противоречит и собственному БП-9."
+    },
+    {
+      "quote": "`SenderUsage.reserve()` вызывается до проверки лимитов | Нарушение порядка — счётчик увеличивается даже при отказе",
+      "category": "ложная_аномалия",
+      "etalon_ref": "L6",
+      "code_ref": "limit-service LimitLedger.decide; SenderUsage.reserve",
+      "explanation": "usage.reserve(amount) вызывается только в ветке else, после того как обе проверки (дневная и месячная) пройдены. При отказе счетчики не растут. Ответ сам пишет в колонке «Код», что вызов внутри else."
+    },
+    {
+      "quote": "`lazyReset` не вызывается при `release()` если `reservedOn` != today | Отпуск резерва в другой день — дневной лимит занижен",
+      "category": "ложная_аномалия",
+      "etalon_ref": "L13",
+      "code_ref": "limit-service SenderUsage.release",
+      "explanation": "release() первым действием всегда вызывает lazyReset(today), а затем вычитает сумму только из периода, где был резерв. Дневной лимит не занижается: это штатное поведение."
+    },
+    {
+      "quote": "Нет проверки на отрицательный `amount` при `release()` | Баг или ручная операция — отрицательное освобождение | dailyUsed/monthlyUsed могут стать отрицательными",
+      "category": "ложная_аномалия",
+      "etalon_ref": "L13",
+      "code_ref": "limit-service SenderUsage.release; LimitLedger.settle",
+      "explanation": "release() ограничивает результат снизу через `.max(BigDecimal.ZERO)`, счетчики не могут стать отрицательными. Сумма берется из резерва в состоянии RESERVED, а он создается только для положительной суммы."
+    },
+    {
+      "quote": "`transferRepository.saveAndFlush()` + `historyRepository.save()` не атомарны | Crash после save, но до save history | Перевод без истории, расходится состояние",
+      "category": "ложная_аномалия",
+      "etalon_ref": "T3",
+      "code_ref": "transfer-service TransferTrackingService.createTransfer",
+      "explanation": "createTransfer помечен @Transactional: перевод и запись истории NEW сохраняются в одной транзакции, перевода без истории не бывает."
+    },
+    {
+      "quote": "Нет индекса на `reservations.state` | Поиск активных резервов (isReserved) | Full scan при большом объёме",
+      "category": "ложная_аномалия",
+      "etalon_ref": "4.2",
+      "code_ref": "limit-service Reservation.isReserved; LimitLedger.settle; ReservationRepository",
+      "explanation": "Reservation.isReserved() проверяет поле уже загруженной сущности в памяти. Резерв читается по PK (findById), запросов по state в коде нет, full scan не возникает."
+    },
+    {
+      "quote": "`createdAt` в `TransferEntity` не уникален | Два перевода с одинаковым ID — разные даты | Нарушение контракта (ID — PK)",
+      "category": "ложная_аномалия",
+      "etalon_ref": "T1, T5–T7",
+      "code_ref": "transfer-service TransferController.create/duplicate; 001-create-tables.sql (transfers.id PRIMARY KEY)",
+      "explanation": "id — первичный ключ: второй перевод с тем же id создать нельзя (ветка дубликата, нарушение PK тоже уводит в дубликат). Уникальность createdAt не требуется, дефекта нет."
+    },
+    {
+      "quote": "`DUPLICATE` — решение уже принято.",
+      "category": "неточность",
+      "etalon_ref": "L2",
+      "code_ref": "limit-service LimitLedger.decide; LimitService.onNewTransfer",
+      "explanation": "Отдельного исхода DUPLICATE в коде нет. При повторном NEW возвращается сохраненное решение (APPROVED или DECLINED), и оно снова отправляется в limit-results. Суть (решение уже принято) верна, исход подан неверно."
+    },
+    {
+      "quote": "Читается: `transfers` (по ID), `transfer_history` (по ID + стадия).",
+      "category": "неточность",
+      "etalon_ref": "T3",
+      "code_ref": "transfer-service TransferController.create; TransferTrackingService.createTransfer",
+      "explanation": "При POST читается только transfers (findById). transfer_history по ID и стадии читает трекер (existsByTransferIdAndStage), а не создание перевода."
+    },
+    {
+      "quote": "Вызвать `LimitLedger.decide(transfer)`. … Получить/создать `SenderUsage` для отправителя. … Вызвать `TransferDecisionService.decide(limitResult, screeningResult)`.",
+      "category": "нарушение_формата",
+      "etalon_ref": "Кейс 2, специфичные штрафы",
+      "code_ref": "prompt.md: «Алгоритм: пошаговое описание на языке бизнеса (без терминов из кода)»",
+      "explanation": "Алгоритмы почти всех точек входа записаны терминами кода (классы, методы, поля dailyUsed/dailyMax, recordServiceResult), а не на языке бизнеса. Ссылки на код стали основой описания, а не справкой в скобках."
+    },
+    {
+      "quote": "ЗАМЕЧАНИЯ К АРХИТЕКТУРЕ (вне рамок, но важно) … 3 отдельных БД (transfer, limit, screening) — усложняет распределённые транзакции.",
+      "category": "нарушение_формата",
+      "etalon_ref": "0.3",
+      "code_ref": "prompt.md: «Архитектуру, интеграции и связи между сервисами НЕ описывай»",
+      "explanation": "Промпт прямо запрещает описывать архитектуру. В ответе есть отдельный раздел 5 с архитектурными замечаниями, и модель сама помечает его как «вне рамок»."
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "Обработка каждого запроса (внутри `decide` и `release`).",
+      "code_ref": "limit-service SenderUsage.release (первая строка: lazyReset(today)); LimitLedger.decide",
+      "explanation": "Ленивое обнуление вызывается не только при решении по NEW, но и при возврате резерва: release() сначала выполняет lazyReset(today). В L5/L13 эталона это прямо не указано."
+    }
+  ],
+  "contamination": [],
+  "notes": "K2-M3(b): дневная и месячная проверки только перечислены по порядку (алгоритм 1.2, таблица 3.2), явного приоритета нет — по правилу явности не засчитано. K2-M3(c) засчитан по явному оператору `<=` в алгоритме и `>` -> DECLINED в таблице 3.2. K2-M5(a) засчитан по полному алгоритму: проверка только по senderId, «Иначе — APPROVED». K2-M4: settle описан одной фразой (вызвать ledger.settle) без COMMITTED/RELEASED и условия RESERVED. Аномалии A1–A5 эталона в реестре отсутствуют. Исход 503 описан верно (T4), но не как аномалия (нет outbox), поэтому S2 не засчитан. A-3 ответа прямо противоречит L13, поэтому S8 не засчитан. В errors не записаны: A-6 (исключение в decide() останавливает поток) — спекулятивно: в decide() нет пути, который бросает исключение, но отсутствие обработчика ошибок Streams как таковое правда; A-7 (screening не обрабатывает финалы, «без бизнес-эффекта») — поведение описано верно, это штатная логика, а не дефект; A-8 (лишний запрос existsByTransferIdAndStage) — по сути верно, мелочь. Раздел 1.6 подает lazyReset как «задачу по расписанию (неявную)», но прямо говорит, что крона нет (БП-19), поэтому это не галлюцинация планировщика. Заголовок 1.4 «сборка финального решения» для трекера неточен, но содержание верное. Многие БП записаны не в формате «Если…, то…», а серьезность задана группировкой — это отклонения от формы без прямого запрета, в errors не записаны. Расхождений эталона с кодом не обнаружено."
+}

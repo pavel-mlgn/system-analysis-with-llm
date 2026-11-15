@@ -1,0 +1,88 @@
+{
+  "case": "01",
+  "answer_id": "L",
+  "mandatory": [
+    {
+      "id": "K1-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Система управляет жизненным циклом денежных переводов между отправителями и получателями."},
+        {"atom": "b", "status": "есть", "quote": "Проверка дневных/месячных лимитов отправителя, публикация решения в `limit-results`"},
+        {"atom": "c", "status": "есть", "quote": "Проверка отправителя на блокировку, публикация результата в `screening-results` … БД `screeningdb` — заблокированные отправители"},
+        {"atom": "d", "status": "есть", "quote": "Решение принимается на основе результатов обеих проверок, финальный статус фиксируется в истории."}
+      ]
+    },
+    {
+      "id": "K1-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "**Event-driven микросервисная архитектура** на базе Apache Kafka. … Синхронные взаимодействия между сервисами отсутствуют."},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "есть", "quote": "собирает асинхронные ответы из `limit-results` и `screening-results`, через **Kafka Streams** (топик `transfers`) принимает финальное решение"}
+      ]
+    },
+    {
+      "id": "K1-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Родительский `transfer-limit-system/pom.xml` объявляет модули: `transfer-service`, `limit-service`, `transfer-common`, `screening-service`."},
+        {"atom": "b", "status": "есть", "quote": "`transfer-common` | Библиотека | Нет | Общие модели (`Transfer record`)"},
+        {"atom": "c", "status": "есть", "quote": "**REST** только у `transfer-service` (эндпоинты `/transfers`). Остальные сервисы REST не предоставляют."}
+      ]
+    },
+    {
+      "id": "K1-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "**Java 21**, **Maven**"},
+        {"atom": "b", "status": "есть", "quote": "**Spring Boot 3.4.1** (родительский `pom.xml`)"},
+        {"atom": "c", "status": "есть", "quote": "**Spring Kafka** (включая Kafka Streams)"},
+        {"atom": "d", "status": "есть", "quote": "**Spring Data JPA** + **Liquibase** … **PostgreSQL 16-alpine** (три отдельных БД)"}
+      ]
+    },
+    {
+      "id": "K1-M5",
+      "atoms": [
+        {"atom": "a", "status": "нет", "quote": ""},
+        {"atom": "b", "status": "есть", "quote": "`limit-results` | `limit-service` (LimitService) | `transfer-service` (KStream … `screening-results` | `screening-service` (ScreeningService) | `transfer-service` (KStream, `TransferEventListener`)"}
+      ]
+    },
+    {
+      "id": "K1-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "**Apache Kafka** | `confluentinc/cp-kafka:7.6.0` | Брокер сообщений"},
+        {"atom": "b", "status": "есть", "quote": "**PostgreSQL (transfer)** | `postgres:16-alpine` … **PostgreSQL (limit)** | `postgres:16-alpine` … **PostgreSQL (screening)** | `postgres:16-alpine`"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K1-S1", "status": "нет", "quote": ""},
+    {"id": "K1-S2", "status": "нет", "quote": ""},
+    {"id": "K1-S3", "status": "нет", "quote": ""},
+    {"id": "K1-S4", "status": "нет", "quote": ""},
+    {"id": "K1-S5", "status": "нет", "quote": ""},
+    {"id": "K1-S6", "status": "есть", "quote": "`postgres:16-alpine` (port 5434) … `postgres:16-alpine` (port 5432) … `postgres:16-alpine` (port 5433)"}
+  ],
+  "errors": [
+    {
+      "quote": "`transfers.DLT` / `limit-results.DLT` / `screening-results.DLT` | DeadLetterPublishingRecoverer (все сервисы)",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "K1-S1; раздел 1 (Каналы Kafka); раздел 5.1; раздел 8 (Частые искажения)",
+      "code_ref": "limit-service и screening-service KafkaErrorHandlingConfig (только бин transfersDlt), их TransferEventsListener слушают только transfers; transfer-service KafkaErrorHandlingConfig (limitResultsDlt, screeningResultsDlt), TransferEventListener",
+      "explanation": "DeadLetterPublishingRecoverer пишет в record.topic() + \".DLT\". limit-service и screening-service читают только transfers, поэтому пишут только в transfers.DLT. limit-results.DLT и screening-results.DLT объявляет и пишет только transfer-service (трекер transfer-tracker)."
+    },
+    {
+      "quote": "проводит скоринговую проверку на предмет блокировки",
+      "category": "неточность",
+      "etalon_ref": "S2; раздел 1 (Назначение)",
+      "code_ref": "screening-service ScreeningJournal.check; BlockedSenderRepository.findBySenderId",
+      "explanation": "Скоринга в системе нет: screening-service ищет senderId в стоп-листе blocked_senders (найден -> DECLINED SENDER_BLOCKED, иначе APPROVED). Суть (проверка на блокировку) верна, механизм назван неверно; то же в формулировке «Решение скоринга»."
+    },
+    {
+      "quote": "Оркестратором выступает `transfer-service`: он принимает REST-запрос, публикует событие `transfers`, собирает асинхронные ответы из `limit-results` и `screening-results` … оркестрация проверок",
+      "category": "неточность",
+      "etalon_ref": "раздел 1 (Архитектурный паттерн: событийная архитектура без оркестратора); раздел 8 (Saga-оркестратора нет)",
+      "code_ref": "limit-service и screening-service TransferEventsListener.onEvent (свои группы limit и screening, реагируют на NEW сами); transfer-service TransferController.publishNew; DecisionTopologyConfig.decisionStream",
+      "explanation": "В системе нет оркестратора: transfer-service только публикует NEW, а limit-service и screening-service независимо реагируют на событие в своих группах; transfer-service лишь сводит ответы JOIN-ом. Механика описана верно (асинхронно, без синхронных вызовов, сведение в Kafka Streams), но роль transfer-service названа неверно - неточность"
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "1) «Оркестратором выступает transfer-service»: эталон описывает архитектуру как событийную без оркестратора, но ошибкой считает только «оркестратор вызывает сервисы по REST». Модель прямо пишет, что синхронных вызовов нет, и верно описывает публикацию NEW и сведение ответов через Kafka Streams. Ярлык спорный, в errors не записан. 2) «персональных лимитов отправителя» и «limitdb — лимиты, резервы»: значения лимитов общие для всех (application.yml limits.daily-max/monthly-max, LimitLedger), в limitdb хранятся счетчики sender_usage и резервы. Формулировка двусмысленна (лимит применяется к каждому отправителю отдельно или задан индивидуально), в errors не записана; для K1-M1(b) взята цитата из таблицы модулей без слова «персональных». 3) «Apache Kafka 7.6.0 (образ Confluent)»: 7.6.0 — версия Confluent Platform, а не Apache Kafka; в скобках есть уточнение, образ в разделе 6 указан верно, в errors не записано. 4) «Родительский pom.xml»: корневой pom.xml — агрегатор (packaging pom), а не родитель модулей; Spring Boot 3.4.1 задан через spring-boot-starter-parent в pom сервисов, у transfer-common родителя нет. Мелочь, не записано. 5) «Spring Kafka (включая Kafka Streams)»: kafka-streams подключен отдельной зависимостью org.apache.kafka:kafka-streams. Мелочь. 6) «Kafka … KStream state store»: state store Kafka Streams локальный (state-dir /tmp/transfer-service-streams), в Kafka лежат только changelog-топики. Не записано. 7) K1-M2(b): независимость и параллельность проверок явно не названы, в таблице только две группы-потребителя у transfers. 8) K1-M5(a): группа transfer-tracker (TransferEventListener) как читатель transfers не указана, запись финалов в transfers из Kafka Streams в таблице каналов не указана. 9) K1-S6 закрыт только портами трех БД (5434/5432/5433); KRaft, healthcheck, Dockerfile с ARG MODULE, тома, порты 9092 и 8080 не названы. Расхождений эталона с кодом по разделам 1, 5, 8 не обнаружено. Ручная сверка: K1-S6 - итог \"есть\" (Claude): порты трех БД 5434/5432/5433 - один из перечисленных в пункте элементов, по прецеденту ответа F кейса 1 одного элемента достаточно (пограничное: других деталей развертывания нет). Ошибка \"Оркестратором выступает transfer-service\" (нашел Gemini) принята как неточность: эталон описывает архитектуру как событийную без оркестратора, проверки реагируют на NEW сами; механика описана верно, поэтому не галлюцинация оркестратора (пограничное). Пункт 1 notes выше этим решением заменен. Неточность \"скоринговая проверка\" (нашел Claude) подтверждена: ScreeningJournal.check ищет senderId в blocked_senders, скоринга нет. Ошибка с *-results.DLT (нашли оба) записана один раз."
+}

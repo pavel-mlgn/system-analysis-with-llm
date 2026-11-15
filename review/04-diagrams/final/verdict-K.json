@@ -1,0 +1,103 @@
+{
+  "case": "04",
+  "answer_id": "K",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Система transfer-limit-system состоит из трёх Spring Boot сервисов (transfer-service, limit-service, screening-service)"},
+        {"atom": "b", "status": "есть", "quote": "трёх отдельных баз PostgreSQL"},
+        {"atom": "c", "status": "есть", "quote": "брокера Kafka с топиками transfers, limit-results, screening-results"},
+        {"atom": "d", "status": "есть", "quote": "controller -- \"Kafka JSON: KafkaTemplate.send(transfers) - publishNew\" --> transfersTopic … limitCore -- \"Kafka JSON: KafkaTemplate.send(limit-results)\" --> limitTopic"},
+        {"atom": "e", "status": "есть", "quote": "transfersTopic -- \"consume @KafkaListener limit-transfers-listener\" --> limitListener … limitTopic -- \"Kafka Streams: builder.stream(limit-results)\" --> streams"}
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "TTS->>TDB: save transfers (status NEW) + transfer_history (stage NEW) … TC->>K: KafkaTemplate.send(transfers) - Transfer.status NEW - publishNew … TC-->>Client: 201 Created - TransferEntity"},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "есть", "quote": "DS->>TDS: decide(limitResult - screeningResult) в окне 10 с"},
+        {"atom": "d", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Показательный отказ: проверка лимита отклоняет перевод (DAILY_LIMIT_EXCEEDED)"},
+        {"atom": "b", "status": "есть", "quote": "если Kafka недоступна при publishNew, TransferController выбрасывает ResponseStatusException 503 … при этом перевод уже сохранён в transfer-db со статусом NEW"},
+        {"atom": "c", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Диаграмма 4а: ER — transfer-db (PostgreSQL transferdb) … Диаграмма 4б: ER — limit-db (PostgreSQL limitdb) … Диаграмма 4в: ER — screening-db (PostgreSQL screeningdb)"},
+        {"atom": "b", "status": "есть", "quote": "transfers ||--o{ transfer_history : \"transfer_id (FK)\" … связь sender_id внешним ключом не оформлена"},
+        {"atom": "c", "status": "есть", "quote": "Диаграмма 4г: ER — объекты, не хранящиеся в БД (сообщения и запросы)"},
+        {"atom": "d", "status": "есть", "quote": "reservations }o..|| sender_usage : \"sender_id (логическая связь)\" … blocked_senders ||..o{ screening_checks : \"sender_id (логическая связь)\""}
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "[*] --> NEW : TransferTrackingService.createTransfer"},
+        {"atom": "b", "status": "есть", "quote": "NEW --> COMPLETED … limit APPROVED и screening APPROVED … NEW --> CANCELLED … только screening DECLINED … NEW --> DENIED … limit DECLINED и screening DECLINED"},
+        {"atom": "c", "status": "есть", "quote": "COMPLETED --> [*] … DENIED --> [*] … CANCELLED --> [*]"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K4-S1", "status": "есть", "quote": "при выходе результата за окно перевод остаётся в NEW, явной обработки этого случая в коде не найдено — требует уточнения"},
+    {"id": "K4-S2", "status": "нет", "quote": ""},
+    {"id": "K4-S3", "status": "нет", "quote": ""},
+    {"id": "K4-S4", "status": "есть", "quote": "screeningListener -. … .-> dltTransfers … tracker -. \"DefaultErrorHandler: FixedBackOff 1000 мс, 3 повторов -> DeadLetterPublishingRecoverer\" .-> dltLimit … .-> dltScreening"},
+    {"id": "K4-S5", "status": "нет", "quote": ""},
+    {"id": "K4-S6", "status": "нет", "quote": ""},
+    {"id": "K4-S7", "status": "есть", "quote": "NEW --> CANCELLED : TransferDecisionService.decide - UNEXPECTED_RESULT"}
+  ],
+  "errors": [
+    {
+      "quote": "резерв уже создан и учтён в дневном расходе, поэтому после финального статуса CANCELLED LimitLedger.settle снимает резерв … Ledger->>LDB: findById reservations - state RESERVED",
+      "category": "искажение",
+      "etalon_ref": "раздел 3, сценарий 2; L6, L11, L13; раздел 8 «CANCELLED всегда возвращает лимит»; 9.1 п. 3",
+      "code_ref": "limit-service LimitLedger.decide; Reservation.decline; LimitLedger.settle",
+      "explanation": "При DAILY_LIMIT_EXCEEDED LimitLedger.decide вызывает reservation.decline (state NONE), а usage.reserve не вызывается: резерва нет, счётчики не увеличены. В LimitLedger.settle для state NONE срабатывает !reservation.isReserved() -> return («nothing to settle»): release и markReleased не выполняются. Компенсация в выбранном сценарии (CANCELLED с decidedBy limit) показана неверно; сама диаграмма противоречит себе (сохраняет NONE, затем читает RESERVED)."
+    },
+    {
+      "quote": "TransferRequest ||..|| Transfer : \"создаётся в TransferTrackingService.createTransfer\"",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "9.4 (Ошибка: связь TransferRequest ||..|| Transfer)",
+      "code_ref": "transfer-service TransferTrackingService.createTransfer; TransferController.publishNew; transfer-common Transfer.newTransfer/withDecision",
+      "explanation": "createTransfer создаёт TransferEntity, а сообщение Transfer создаётся в TransferController.publishNew через Transfer.newTransfer. Связь 1:1 неверна: по одному запросу (id) порождается несколько сообщений Transfer (NEW, повторные NEW при дублях, ответы в limit-results и screening-results, финал)."
+    },
+    {
+      "quote": "blocked_senders ||..o{ screening_checks : \"sender_id (логическая связь)\"",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "9.4 (blocked_senders |o..o{ screening_checks); 4.3",
+      "code_ref": "screening-service ScreeningJournal.check; 002-insert-test-data.sql",
+      "explanation": "Запись screening_checks создаётся для любого отправителя, а в blocked_senders есть только заблокированные (5 тестовых строк). У проверки 0..1 заблокированный отправитель, а не ровно один; для APPROVED-проверок соответствующей строки нет."
+    },
+    {
+      "quote": "reservations }o..|| sender_usage : \"sender_id (логическая связь)\"",
+      "category": "неточность",
+      "etalon_ref": "9.4 (Неточность: 1 вместо 0..1); 4.2; L3",
+      "code_ref": "limit-service LimitLedger.decide (ветка INVALID_AMOUNT, ранний return)",
+      "explanation": "При INVALID_AMOUNT резерв сохраняется без загрузки и сохранения sender_usage, поэтому для нового отправителя строки счётчиков нет: кардинальность 0..1, а не ровно 1."
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "TransferController выбрасывает ResponseStatusException 503 с текстом «Kafka недоступна, перевод сохранён — повторите запрос с тем же id»",
+      "code_ref": "transfer-service TransferController.KAFKA_UNAVAILABLE, TransferController.publishNew",
+      "explanation": "Точный текст 503 совпадает с константой KAFKA_UNAVAILABLE; ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, ...) выбрасывается в publishNew."
+    },
+    {
+      "quote": "consume @KafkaListener limit-transfers-listener … consume @KafkaListener screening-transfers-listener",
+      "code_ref": "limit-service TransferEventsListener @KafkaListener(id = \"limit-transfers-listener\"); screening-service TransferEventsListener @KafkaListener(id = \"screening-transfers-listener\")",
+      "explanation": "Идентификаторы контейнеров слушателей указаны верно (отдельно от groupId limit/screening, которые тоже указаны верно)."
+    }
+  ],
+  "contamination": [],
+  "notes": "K4-M2(b): нет ни par, ни явной пометки параллельности — обработка limit и screening нарисована последовательно. K4-M2(d): в happy path финал COMPLETED читает только трекер; чтение финала limit-service (settle -> COMMITTED) на диаграмме 2 не показано, есть лишь в тексте о состояниях Reservation и на диаграмме 3 — не засчитано. K4-M3: основной сценарий — бизнес-отказ limit (CANCELLED, decidedBy limit), в нём резерва нет, поэтому показанная компенсация неверна (ошибка в errors), атом (c) не закрыт; атом (b) закрыт по особому указанию для технического отказа — после диаграммы 3 верно описано, что при 503 перевод остаётся в transfer-db в статусе NEW. K4-S2: состояния Reservation перечислены верно, но конечность NONE не названа, а диаграмма 3 фактически изображает переход NONE -> RELEASED. K4-S3: трекер — отдельный участник, но то, что screening-service финал только логирует, не показано и не сказано. K4-S5: типы обобщённые (decimal, varchar), без DECIMAL(15,2) и NOT NULL; UNIQUE(transfer_id, stage) упомянут только текстом. Сомнительные места, не внесённые в errors: (1) «Обработка сбоев Kafka Streams внутри decisionStream (конфигурация exception handler для Streams) в коде не найдена» — в transfer-service application.yml задан default.deserialization.exception.handler = LogAndContinueExceptionHandler, но фраза ограничена «внутри decisionStream» и подана как вопрос; (2) «при неуспешной обработке любого сообщения listener'ы после 3 повторов ... публикуют его в DLT» — для не десериализуемых сообщений DLT сразу, без повторов, но фраза говорит об ошибке обработки, о битых сообщениях прямо не сказано; (3) transfers ||--o{ transfer_history — эталон даёт 1..4 (|{), схема БД ноль строк допускает; (4) на диаграмме 1 to(transfers) нарисован от узла TransferDecisionService, а не от топологии — упрощение. Формат: между некоторыми диаграммами больше 1–2 предложений (после диаграмм 1, 3 и 5), но часть текста выполняет другие явные требования промпта («в коде не найдено», перечень других сущностей с жизненным циклом), поэтому в errors не внесено. Расхождений эталона с кодом не обнаружено. Ручная сверка: K4-M3c — нет (Gemini засчитал по показанной компенсации). Компенсация на диаграмме 3 нарисована в сценарии отказа лимита, где резерва нет (Reservation.decline -> NONE, LimitLedger.settle выходит по !reservation.isReserved()), поэтому утверждение неверно и атом не закрывает; K4-M3b закрыт техническим отказом (503, NEW остается в БД). Так же решено для ответа G кейса 4. Искажение по компенсации нашли оба, записано один раз. Ошибки, найденные только Claude, подтверждены: TransferRequest ||..|| Transfer — мелкая_ошибка (так же для ответов A и E кейса 4), blocked_senders ||..o{ screening_checks — мелкая_ошибка (так же для ответов A, E и G кейса 4), reservations }o..|| sender_usage — неточность по 9.4 эталона (так же для ответа A кейса 4). Отклонена ложная_аномалия Gemini «Обработка сбоев Kafka Streams внутри decisionStream … в коде не найдена» (пограничное): фраза ограничена кодом топологии, где обработки действительно нет, подана как «требует уточнения» и дефектом ничего не объявляет; LogAndContinueExceptionHandler в application.yml transfer-service покрывает только ошибки десериализации."
+}

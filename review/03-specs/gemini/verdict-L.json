@@ -1,0 +1,70 @@
+{
+  "case": "03",
+  "answer_id": "L",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "POST /transfers…GET /transfers…GET /transfers/{id}"},
+        {"atom": "b", "status": "есть", "quote": "201 | Перевод создан…200 | Перевод уже существует…400 | Ошибка валидации…409 | Конфликт параметров…503 | Kafka недоступна"},
+        {"atom": "c", "status": "есть", "quote": "GET /transfers/{id}…200 | OK…404 | Перевод не найден"},
+        {"atom": "d", "status": "есть", "quote": "integer (int64)…number (decimal)…string…array"}
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfer-db: transfers…transfer-db: transfer_history…limit-db: sender_usage…limit-db: reservations…screening-db: blocked_senders…screening-db: screening_checks"},
+        {"atom": "b", "status": "есть", "quote": "amount | DECIMAL(15,2)"},
+        {"atom": "c", "status": "есть", "quote": "reservations…transfer_id | BIGINT | да…screening_checks…transfer_id | BIGINT | да"},
+        {"atom": "d", "status": "есть", "quote": "transfer_history…transfer_id | BIGINT | нет | да (transfers.id)"},
+        {"atom": "e", "status": "есть", "quote": "uq_transfer_history_stage | transfer_id, stage"},
+        {"atom": "f", "status": "есть", "quote": "blocked_senders…sender_id | BIGINT | нет | нет | да"}
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "id | Long…senderId | Long…recipientId | Long…amount | BigDecimal…currency | String…status | String…decidedBy | String…messageInfo | String…createdAt | LocalDateTime"},
+        {"atom": "b", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Тип | Kafka topic…Partitions | 3…Cleanup policy | compact"},
+        {"atom": "b", "status": "есть", "quote": "Key | Long (transfer id)…Value | Transfer (JSON)"},
+        {"atom": "c", "status": "есть", "quote": "Отправители | transfer-service…Получатели | limit-service, screening-service, transfer-tracker…Группа потребителей | limit, screening, transfer-tracker"}
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Расхождений нет. Файл контракта openapi/transfer-api.yaml полностью соответствует коду."}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K3-S1", "status": "есть", "quote": "version | BIGINT | нет | нет | нет | да | 0 | нет | Версия"},
+    {"id": "K3-S2", "status": "есть", "quote": "limit-db: reservations…FK | нет…screening-db: screening_checks…FK | нет"},
+    {"id": "K3-S3", "status": "нет", "quote": ""},
+    {"id": "K3-S4", "status": "нет", "quote": ""},
+    {"id": "K3-S5", "status": "нет", "quote": ""},
+    {"id": "K3-S6", "status": "нет", "quote": ""},
+    {"id": "K3-S7", "status": "нет", "quote": ""},
+    {"id": "K3-S8", "status": "нет", "quote": ""},
+    {"id": "K3-S9", "status": "нет", "quote": ""}
+  ],
+  "errors": [
+    {
+      "quote": "Канал: limit-results.DLT…Отправители | limit-service…Канал: screening-results.DLT…Отправители | screening-service",
+      "category": "мелкая ошибка",
+      "etalon_ref": "раздел 11: Кейс 3, специфичные штрафы (*-results.DLT у всех сервисов - мелкая ошибка); раздел 0.3 (существующий метод приписан не тому классу)",
+      "code_ref": "transfer-service/src/main/java/com/example/transfer/config/KafkaErrorHandlingConfig.java",
+      "explanation": "Эти DLT-топики объявляет и пишет только transfer-service при ошибках в слушателях ответов. limit-service и screening-service их не пишут."
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Модель не нашла реальных расхождений OpenAPI с кодом, но за пропуск (если не выдумано несуществующее) штрафа не полагается (пункт M5 засчитывается при явной формулировке, сильный S7 не засчитывается)."
+}

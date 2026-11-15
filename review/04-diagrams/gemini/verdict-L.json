@@ -1,0 +1,92 @@
+{
+  "case": "04",
+  "answer_id": "L",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "subgraph \"transfer-service\"…subgraph \"limit-service\"…subgraph \"screening-service\""},
+        {"atom": "b", "status": "есть", "quote": "subgraph \"transfer-db\"…subgraph \"limit-db\"…subgraph \"screening-db\""},
+        {"atom": "c", "status": "есть", "quote": "subgraph \"Kafka Broker\"\n        TransfersTopic[\"transfers\"]…LimitResultsTopic…ScreeningResultsTopic"},
+        {"atom": "d", "status": "есть", "quote": "Client -->|POST /transfers| TransferController…KafkaProducer -->|send| TransfersTopic"},
+        {"atom": "e", "status": "есть", "quote": "TransfersTopic -->|consume| LimitEventsListener…LimitService -->|sendAndWait| KafkaProducer"}
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {"atom": "a", "status": "нет", "quote": ""},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "есть", "quote": "TransferDecisionService->>TransferDecisionService: decide(APP, APP) -> COMPLETED"},
+        {"atom": "d", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "LimitLedger->>ReservationRepository: save(reservation DECLINED)…TransferDecisionService->>TransferDecisionService: decide(DECLINED, null) -> CANCELLED"},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "\"transfer-service DB (transferdb)\".transfers…\"limit-service DB (limitdb)\".sender_usage…\"screening-service DB (screeningdb)\".blocked_senders"},
+        {"atom": "b", "status": "есть", "quote": "transfer_history }|--|| transfers : \"FK transfer_id\""},
+        {"atom": "c", "status": "нет", "quote": ""},
+        {"atom": "d", "status": "есть", "quote": "\"Logical links (no FK)\":\n    transfers.sender_id -> sender_usage.sender_id"}
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "[*] --> NEW"},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "есть", "quote": "COMPLETED --> [*]\n        CANCELLED --> [*]\n        DENIED --> [*]"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K4-S1", "status": "нет", "quote": ""},
+    {"id": "K4-S2", "status": "нет", "quote": ""},
+    {"id": "K4-S3", "status": "нет", "quote": ""},
+    {"id": "K4-S4", "status": "нет", "quote": ""},
+    {"id": "K4-S5", "status": "нет", "quote": ""},
+    {"id": "K4-S6", "status": "нет", "quote": ""},
+    {"id": "K4-S7", "status": "нет", "quote": ""}
+  ],
+  "errors": [
+    {
+      "quote": "Note over ReservationRepository: Резервирование создано (state=RESERVED),<br>но при CANCELLED будет выполнено release()",
+      "category": "искажение",
+      "etalon_ref": "раздел 3, сценарий 2; раздел 8",
+      "code_ref": "limit-service LimitLedger.decide; Reservation.decline()",
+      "explanation": "При отказе лимита резерв создается в состоянии NONE, поэтому возврат (release) при CANCELLED недостижим и не выполняется."
+    },
+    {
+      "quote": "NEW --> LIMIT : После публикации в Kafka\n        LIMIT --> SCREENING : После получения limit-results\n        SCREENING --> FINAL",
+      "category": "искажение",
+      "etalon_ref": "раздел 4.1; раздел 9.5; чек-лист К4",
+      "code_ref": "transfer-service TransferEntity.status",
+      "explanation": "LIMIT, SCREENING и FINAL — это этапы истории (HistoryStage), а не статусы перевода (статусы TransferEntity — только NEW, COMPLETED, CANCELLED, DENIED). Неверный переход состояния."
+    },
+    {
+      "quote": "LimitResultsTopic->>TransferDecisionService: onEvent(limit APPROVED)",
+      "category": "неточность",
+      "etalon_ref": "раздел 5.3",
+      "code_ref": "transfer-service DecisionTopologyConfig",
+      "explanation": "JOIN ответов выполняется через Kafka Streams topology, а не через consumer с методом onEvent."
+    },
+    {
+      "quote": "TransferEventListener->>TransferTrackingService: recordServiceResult(LIMIT)",
+      "category": "неточность",
+      "etalon_ref": "раздел 3",
+      "code_ref": "transfer-service TransferEventListener.onEvent",
+      "explanation": "На диаграмме трекер записывает этап LIMIT после применения финала CANCELLED, хотя в реальности ответы от сервисов обрабатываются и записываются в историю до формирования финала."
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "В C4 диаграмме имена слушателей указаны слегка неточно (LimitEventsListener вместо TransferEventsListener), но в контексте subgraph сервиса смысл не теряется. Отсутствие 201 ответа на Sequence-диаграмме также означает незакрытый K4-M2(a)."
+}

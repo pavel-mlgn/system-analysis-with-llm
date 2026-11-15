@@ -1,0 +1,113 @@
+{
+  "case": "04",
+  "answer_id": "L",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "subgraph \"transfer-service\" … subgraph \"limit-service\" … subgraph \"screening-service\""},
+        {"atom": "b", "status": "есть", "quote": "subgraph \"transfer-db\" … subgraph \"limit-db\" … subgraph \"screening-db\""},
+        {"atom": "c", "status": "есть", "quote": "subgraph \"Kafka Broker\" … TransfersTopic[\"transfers\"] … LimitResultsTopic[\"limit-results\"] … ScreeningResultsTopic[\"screening-results\"]"},
+        {"atom": "d", "status": "есть", "quote": "Client -->|POST /transfers| TransferController … TransfersTopic -->|consume| LimitEventsListener"},
+        {"atom": "e", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {"atom": "a", "status": "нет", "quote": ""},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "есть", "quote": "LimitResultsTopic->>TransferDecisionService: onEvent(limit APPROVED) … ScreeningResultsTopic->>TransferDecisionService: onEvent(screening APPROVED) … decide(APP, APP) -> COMPLETED"},
+        {"atom": "d", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Сценарий отказа (превышен дневной лимит) … LimitService->>KafkaProducer: send(\"limit-results\", DECLINED, DAILY_LIMIT_EXCEEDED)"},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "\"transfer-service DB (transferdb)\".transfers { … \"limit-service DB (limitdb)\".sender_usage { … \"screening-service DB (screeningdb)\".blocked_senders {"},
+        {"atom": "b", "status": "есть", "quote": "BIGINT transfer_id FK \"references transfers(id)\" … transfer_history }|--|| transfers : \"FK transfer_id\""},
+        {"atom": "c", "status": "нет", "quote": ""},
+        {"atom": "d", "status": "есть", "quote": "\"Logical links (no FK)\": … reservations.sender_id -> sender_usage.sender_id"}
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "[*] --> NEW"},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "есть", "quote": "COMPLETED --> [*] … CANCELLED --> [*] … DENIED --> [*]"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K4-S1", "status": "нет", "quote": ""},
+    {"id": "K4-S2", "status": "нет", "quote": ""},
+    {"id": "K4-S3", "status": "нет", "quote": ""},
+    {"id": "K4-S4", "status": "нет", "quote": ""},
+    {"id": "K4-S5", "status": "нет", "quote": ""},
+    {"id": "K4-S6", "status": "нет", "quote": ""},
+    {"id": "K4-S7", "status": "нет", "quote": ""}
+  ],
+  "errors": [
+    {
+      "quote": "LimitService -->|sendAndWait| KafkaProducer … ScreeningService -->|sendAndWait| KafkaProducer",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "9.1 (компонентная: никаких прямых вызовов между сервисами); K4-M1(e)",
+      "code_ref": "limit-service LimitService (поле KafkaTemplate<Long, Transfer>, sendAndWait); screening-service ScreeningService.sendAndWait; transfer-service TransferController.publishNew",
+      "explanation": "Узел KafkaProducer (KafkaTemplate) нарисован внутри subgraph transfer-service, и в него идут вызовы из limit-service и screening-service. Получается прямой межсервисный вызов. В коде у каждого сервиса свой KafkaTemplate со своими настройками продюсера в application.yml. Существующий компонент отнесён не к тому контейнеру."
+    },
+    {
+      "quote": "LimitResultsTopic->>TransferDecisionService: onEvent(limit DECLINED) … TransferDecisionService->>KafkaProducer: send(\"transfers\", COMPLETED)",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "5.3; раздел 8 (onEvent есть только у слушателей)",
+      "code_ref": "transfer-service TransferDecisionService.decide; DecisionTopologyConfig.decisionStream; TransferEventListener.onEvent",
+      "explanation": "У TransferDecisionService нет onEvent, и он ничего не отправляет через KafkaTemplate: в нём только метод decide(limitResult, screeningResult). Kafka Streams вызывает его как joiner в DecisionTopologyConfig, а результат пишет в transfers через .to(\"transfers\"). onEvent есть у TransferEventListener и TransferEventsListener."
+    },
+    {
+      "quote": "TransferDecisionService->>TransferDecisionService: decide(DECLINED, null) -> CANCELLED",
+      "category": "искажение",
+      "etalon_ref": "2.2; 5.3; A1",
+      "code_ref": "transfer-service DecisionTopologyConfig (inner join, JoinWindows.ofTimeDifferenceWithNoGrace(10 s)); TransferDecisionService.decide",
+      "explanation": "Финал считается только после того, как inner join сведёт пару ответов limit и screening. Без ответа screening финала нет, перевод остаётся NEW, а с null decide упал бы на screeningResult.status(). Итог при limit DECLINED зависит от screening: при APPROVED это CANCELLED с decidedBy=limit, при DECLINED это DENIED. Безусловный CANCELLED по одному ответу limit — неверный итог."
+    },
+    {
+      "quote": "Резервирование создано (state=RESERVED),<br>но при CANCELLED будет выполнено release()",
+      "category": "искажение",
+      "etalon_ref": "2.3 L6, L11, L13; сценарий 2 раздела 3; раздел 8 («CANCELLED всегда возвращает лимит»)",
+      "code_ref": "limit-service LimitLedger.decide; LimitLedger.settle; Reservation.decline",
+      "explanation": "При DAILY_LIMIT_EXCEEDED LimitLedger.decide вызывает reservation.decline(), state становится NONE, а usage.reserve(amount) не вызывается: счётчики не растут. Строка «LimitLedger->>SenderUsageRepository: reserve(amount)» на диаграмме 3 это противоречит. В settle при !isReserved() пишется «nothing to settle», release() не выполняется. При отказе limit резерва и компенсации нет."
+    },
+    {
+      "quote": "NEW --> LIMIT : После публикации в Kafka … LIMIT --> SCREENING : После получения limit-results … SCREENING --> FINAL : После получения screening-results",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "9.5; 2.1 T8, T9; специфичный штраф К4 «неверный переход состояния»",
+      "code_ref": "transfer-service TransferTrackingService.recordServiceResult (статус не меняется), applyFinalStatus; HistoryStage",
+      "explanation": "LIMIT, SCREENING и FINAL — это этапы истории (HistoryStage, transfer_history.stage), а не статусы TransferEntity. Статус перевода переходит из NEW сразу в COMPLETED, CANCELLED или DENIED в applyFinalStatus. Кроме того, проверки limit и screening идут параллельно, а не одна за другой."
+    },
+    {
+      "quote": "state LIMIT { … PENDING --> APPROVED : if limit approved … PENDING --> DECLINED : if limit declined",
+      "category": "искажение",
+      "etalon_ref": "раздел 8 («статус перевода меняется на APPROVED / DECLINED»); 4.1",
+      "code_ref": "transfer-service TransferTrackingService.recordServiceResult; TransferEntity.status; openapi TransferStatus",
+      "explanation": "APPROVED и DECLINED нарисованы как состояния TransferEntity, хотя эти значения бывают только в истории и в топиках ответов. Статус перевода — только NEW, COMPLETED, CANCELLED или DENIED. Значения PENDING в коде нет вообще."
+    },
+    {
+      "quote": "Диаграмма 4: ER-диаграмма (все базы данных)",
+      "category": "нарушение_формата",
+      "etalon_ref": "9.1 (ER: диаграмма по каждой БД плюс отдельная для сообщения)",
+      "code_ref": "prompt.md, ДИАГРАММА 4",
+      "explanation": "Промпт прямо требует отдельную ER-диаграмму для каждой БД (4а, 4б, …) и отдельную диаграмму для объектов вне БД, FK сплошной линией, логические связи пунктиром. В ответе одна общая диаграмма, отдельной диаграммы сообщения нет, логические связи даны текстом внутри блока mermaid, а не пунктирными линиями."
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "K4-M1(d) засчитан: на HTTP-связи указан эндпоинт, топики — отдельные узлы, через которые идут связи. Протоколы (Kafka, JDBC) не названы. Из-за общего узла KafkaProducer нельзя понять, какой сервис пишет в какой топик; это учтено в M1(e) и в errors. K4-M2(c) засчитан по конструкции: два ответа приходят в TransferDecisionService, затем decide(APP, APP) -> COMPLETED. При этом Kafka Streams, join и окно 10 с нигде не названы, а диаграмма 3 противоречит семантике inner join. Если считать, что атом требует явно назвать JOIN, его можно снять. K4-M2(a): ответа 201 клиенту на диаграмме нет совсем. K4-M4(a) засчитан: каждая таблица помечена своей БД через префикс имени, но диаграмма одна (учтено как нарушение_формата). В ER две противоречащие друг другу связи transfers–transfer_history: ||--o{ и }|--||; вторая верна, первая допустима на уровне схемы, в errors не включена. K4-S5 не засчитан: SQL-типы точные (DECIMAL(15,2), длины VARCHAR), но NOT NULL, UNIQUE и DEFAULT отсутствуют. K4-S3 не засчитан: трекер TransferEventListener показан отдельным участником, но того, что screening только логирует финал, нет. K4-S4: DLT-топики показаны узлами без продюсеров. Спорные места, не включённые в errors: стрелки «LimitLedger->>SenderUsageRepository: findById / lazyReset» и «reserve(amount)» адресуют методы SenderUsage репозиторию; «TransferController -->|save| TransferRepository»: контроллер не вызывает save, сохраняет TransferTrackingService.createTransfer. Ошибка 4 (reserve при отказе и release при CANCELLED) записана одной записью как одно заблуждение, хотя затрагивает и decide, и settle. Между диаграммами нет поясняющих предложений, только заголовки (не штрафуется). Расхождений эталона с кодом не найдено."
+}

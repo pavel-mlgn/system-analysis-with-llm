@@ -1,0 +1,81 @@
+{
+  "case": "01",
+  "answer_id": "L",
+  "mandatory": [
+    {
+      "id": "K1-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "управляет жизненным циклом денежных переводов между отправителями и получателями"},
+        {"atom": "b", "status": "есть", "quote": "проверяет соблюдение персональных лимитов отправителя (дневных и месячных)"},
+        {"atom": "c", "status": "есть", "quote": "проводит скоринговую проверку на предмет блокировки"},
+        {"atom": "d", "status": "есть", "quote": "Решение принимается на основе результатов обеих проверок"}
+      ]
+    },
+    {
+      "id": "K1-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Event-driven микросервисная архитектура на базе Apache Kafka… Синхронные взаимодействия между сервисами отсутствуют."},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "есть", "quote": "через Kafka Streams (топик transfers) принимает финальное решение"}
+      ]
+    },
+    {
+      "id": "K1-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfer-service | Микросервис… limit-service | Микросервис… screening-service | Микросервис… transfer-common | Библиотека"},
+        {"atom": "b", "status": "есть", "quote": "transfer-common | Библиотека | Нет | Общие модели"},
+        {"atom": "c", "status": "есть", "quote": "REST только у transfer-service (эндпоинты /transfers). Остальные сервисы REST не предоставляют."}
+      ]
+    },
+    {
+      "id": "K1-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Java 21"},
+        {"atom": "b", "status": "есть", "quote": "Spring Boot 3.4.1"},
+        {"atom": "c", "status": "есть", "quote": "Spring Kafka (включая Kafka Streams)… Apache Kafka 7.6.0"},
+        {"atom": "d", "status": "есть", "quote": "Spring Data JPA + Liquibase… PostgreSQL 16-alpine"}
+      ]
+    },
+    {
+      "id": "K1-M5",
+      "atoms": [
+        {"atom": "a", "status": "нет", "quote": ""},
+        {"atom": "b", "status": "есть", "quote": "limit-results | limit-service… | transfer-service… screening-results | screening-service… | transfer-service…"}
+      ]
+    },
+    {
+      "id": "K1-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "confluentinc/cp-kafka:7.6.0"},
+        {"atom": "b", "status": "есть", "quote": "postgres:16-alpine (три отдельных БД)"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K1-S1", "status": "нет", "quote": ""},
+    {"id": "K1-S2", "status": "нет", "quote": ""},
+    {"id": "K1-S3", "status": "нет", "quote": ""},
+    {"id": "K1-S4", "status": "нет", "quote": ""},
+    {"id": "K1-S5", "status": "нет", "quote": ""},
+    {"id": "K1-S6", "status": "нет", "quote": ""}
+  ],
+  "errors": [
+    {
+      "quote": "transfers.DLT / limit-results.DLT / screening-results.DLT | DeadLetterPublishingRecoverer (все сервисы)",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "раздел 5.1; раздел 11, Специфичные штрафы",
+      "code_ref": "transfer-service/config/KafkaErrorHandlingConfig; limit-service/config/KafkaErrorHandlingConfig; screening-service/config/KafkaErrorHandlingConfig",
+      "explanation": "limit-service и screening-service объявляют и пишут только в transfers.DLT, а топики *-results.DLT используются только в transfer-service"
+    },
+    {
+      "quote": "Оркестратором выступает transfer-service: он принимает REST-запрос, публикует событие transfers, собирает асинхронные ответы",
+      "category": "неточность",
+      "etalon_ref": "раздел 1, Архитектурный паттерн",
+      "code_ref": "transfer-service/config/DecisionTopologyConfig",
+      "explanation": "В системе используется хореография без оркестратора; transfer-service агрегирует результаты через Kafka Streams JOIN, но не выступает в роли Saga-оркестратора"
+    }
+  ],
+  "outside_etalon_correct": [],
+  "contamination": [],
+  "notes": "Для K1-M5(a) не засчитано, т.к. пропущена группа transfer-tracker."
+}
