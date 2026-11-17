@@ -6,6 +6,7 @@
 | Claude Opus 5.5 High | 9 | 15 | 13,5 | 14 | 16 | **67,5** | 89% |
 | Gemini 4 Carbon High | 10 | 13 | 10,5 | 14 | 13,5 | **61** | 80% |
 | ChatGPT GPT-5.6 Sol High | 10 | 13 | 12 | 10 | 11 | **56** | 74% |
+| Qwen 4 Max Thinking | 11 | 13,5 | 11,5 | 7,5 | 12,5 | **56** | 74% |
 | Kimi K3.1 Pro Max | 10 | 13 | 12,5 | 2 | 14 | **51,5** | 68% |
 | Gemini 4 Argon High | 8 | 11 | 10,5 | 10,5 | 11 | **51** | 67% |
 | Алиса AI Эксперт | 8 | 12 | 9 | 4,5 | 10 | **43,5** | 57% |
@@ -23,6 +24,7 @@
 | Claude Opus 5.5 High | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | Gemini 4 Carbon High | 3 | 0 | 1 | 0 | 0 | 0 | 0 |
 | ChatGPT GPT-5.6 Sol High | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
+| Qwen 4 Max Thinking | 5 | 3 | 5 | 0 | 0 | 1 | 0 |
 | Kimi K3.1 Pro Max | 2 | 3 | 0 | 0 | 1 | 1 | 0 |
 | Gemini 4 Argon High | 4 | 2 | 1 | 0 | 0 | 2 | 0 |
 | Алиса AI Эксперт | 6 | 3 | 1 | 0 | 1 | 1 | 0 |

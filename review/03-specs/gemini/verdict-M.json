@@ -1,0 +1,81 @@
+{
+  "case": "03",
+  "answer_id": "M",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "POST /transfers... GET /transfers... GET /transfers/{id}"},
+        {"atom": "b", "status": "есть", "quote": "201 | Создана новая запись... 200 | Запись с таким id... 400 | Не пройдена валидация... 409 | Тот же id... 503 | Ошибка... 500 | Любое иное"},
+        {"atom": "c", "status": "есть", "quote": "200 | Перевод найден, тело {transfer, history}... 404 | Перевод не найден"},
+        {"atom": "d", "status": "есть", "quote": "integer (int64)... number (decimal)... string... string (date-time)... array of object"}
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfers (база: transferdb)... transfer_history (база: transferdb)... sender_usage (база: limitdb)... reservations (база: limitdb)... blocked_senders... screening_checks"},
+        {"atom": "b", "status": "есть", "quote": "amount | DECIMAL(15,2) | — | — | — | да"},
+        {"atom": "c", "status": "есть", "quote": "reservations... transfer_id | BIGINT | да... screening_checks... transfer_id | BIGINT | да"},
+        {"atom": "d", "status": "есть", "quote": "FOREIGN KEY → transfers(id) | transfer_id"},
+        {"atom": "e", "status": "есть", "quote": "UNIQUE uq_transfer_history_stage | transfer_id, stage"},
+        {"atom": "f", "status": "есть", "quote": "blocked_senders... sender_id | BIGINT | — | — | да (UNIQUE)"}
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "id | Long... senderId | Long... recipientId | Long... amount | BigDecimal... currency | String... status | String... decidedBy | String... messageInfo | String... createdAt | LocalDateTime"},
+        {"atom": "b", "status": "есть", "quote": "NEW (transfers, публикация из API); APPROVED/DECLINED (limit-results, screening-results); COMPLETED/CANCELLED/DENIED (transfers, выход Streams)"}
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfers... Число партиций | 3... Политика хранения / очистки | compact... limit-results... screening-results"},
+        {"atom": "b", "status": "есть", "quote": "Ключ сообщения | Long — Transfer.id... Сериализация значения | JsonSerializer"},
+        {"atom": "c", "status": "есть", "quote": "Получатели (группы) | limit-service — group limit... screening-service — group screening... transfer-service — group transfer-tracker"}
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "4. РАСХОЖДЕНИЯ КОНТРАКТА API С КОДОМ... POST /transfers, ответ 500 | не описан... GET /transfers/{id}, ответ 400 | не описан"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K3-S1", "status": "есть", "quote": "version | BIGINT | — | — | — | да | 0 | — | Счётчик оптимистичной блокировки (@Version, SenderUsage.version)"},
+    {"id": "K3-S2", "status": "есть", "quote": "reservations... FK | —... screening_checks... FK | —"},
+    {"id": "K3-S3", "status": "есть", "quote": "limit-results.DLT... Отправители | transfer-service: DeadLetterPublishingRecoverer... screening-results.DLT... Отправители | transfer-service: DeadLetterPublishingRecoverer"},
+    {"id": "K3-S4", "status": "нет", "quote": ""},
+    {"id": "K3-S5", "status": "есть", "quote": "state | RESERVED, COMMITTED, RELEASED, NONE"},
+    {"id": "K3-S6", "status": "есть", "quote": "group = application.id (явно не задан: spring.kafka.streams.application-id отсутствует, используется spring.application.name=transfer-service)"},
+    {"id": "K3-S7", "status": "есть", "quote": "GET /transfers/{id}, ответ 400 | не описан... Transfer.createdAt... format не указан... Обязательность полей... required не задан"},
+    {"id": "K3-S8", "status": "нет", "quote": ""},
+    {"id": "K3-S9", "status": "нет", "quote": ""}
+  ],
+  "errors": [
+    {
+      "quote": "Формат сообщения Transfer... createdAt | LocalDateTime... Пример | \"2026-11-17T10:15:30\"",
+      "category": "неточность",
+      "etalon_ref": "4.4",
+      "code_ref": "Kafka message deserialization logs / spring-kafka defaults",
+      "explanation": "В Kafka LocalDateTime сериализуется массивом из 5-7 элементов (spring-kafka default ObjectMapper), а не ISO-строкой. Утверждение об ISO-строке в примерах Kafka сообщений является неточностью."
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "currency | ... | нет — @Pattern(\"[A-Z]{3}\") применяется только к заданному значению | Код валюты; при отсутствии подставляется \"RUB\"",
+      "code_ref": "TransferRequest.java",
+      "explanation": "Верное замечание о том, что аннотация валидации @Pattern применяется только если поле передано, а отсутствие поля корректно обрабатывается через currencyOrDefault()."
+    },
+    {
+      "quote": "transfers.DLT... Политика хранения / очистки | в коде не задана (TopicBuilder без .compact()) — применяется политика брокера по умолчанию",
+      "code_ref": "KafkaErrorHandlingConfig.java",
+      "explanation": "Верно подмечено, что для DLT топиков явно не задана политика compact, поэтому применяется дефолтная политика брокера (delete)."
+    }
+  ],
+  "contamination": [],
+  "notes": "Пункт K3-S4 поглощен обязательным пунктом K3-M3b, так как ссылается на один и тот же факт (три набора статусов)."
+}

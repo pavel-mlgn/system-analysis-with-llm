@@ -1,0 +1,115 @@
+{
+  "case": "05",
+  "answer_id": "M",
+  "mandatory": [
+    {
+      "id": "K5-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "`limit-service`, логика проверки NEW | модифицируемый | Новое правило … При получении NEW, у которого `amount > singleTransferMax`, система должна отклонить перевод"},
+        {"atom": "b", "status": "есть", "quote": "`status = DECLINED`, `decidedBy = limit`, причина `SINGLE_TRANSFER_LIMIT_EXCEEDED` … Новый код причины должен укладываться в `reservations.reason VARCHAR(50)`"},
+        {"atom": "c", "status": "есть", "quote": "При `amount = singleTransferMax` система должна считать порог не превышенным (граница разрешена)"},
+        {"atom": "d", "status": "есть", "quote": "порядок проверок и возвращать **одну** причину по первому сработавшему правилу: `INVALID_AMOUNT` → `SINGLE_TRANSFER_LIMIT_EXCEEDED` → `DAILY_LIMIT_EXCEEDED` → `MONTHLY_LIMIT_EXCEEDED`"}
+      ]
+    },
+    {
+      "id": "K5-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "limit DECLINED + screening APPROVED → `CANCELLED`, `decidedBy = limit` … limit DECLINED + screening DECLINED → `DENIED`, `messageInfo = \"SINGLE_TRANSFER_LIMIT_EXCEEDED; SENDER_BLOCKED\"`"},
+        {"atom": "b", "status": "есть", "quote": "**не изменять** `sender_usage` … `sender_usage` не изменён"},
+        {"atom": "c", "status": "есть", "quote": "зафиксировать решение в `reservations` с `state = NONE` … в `reservations`: `decision = DECLINED`, `reason = SINGLE_TRANSFER_LIMIT_EXCEEDED`, `state = NONE`"}
+      ]
+    },
+    {
+      "id": "K5-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "без перезапуска сервиса; значения должны сохраняться после перезапуска … `limit-service`, БД `limitdb`: таблица `limit_settings` | новый"},
+        {"atom": "b", "status": "есть", "quote": "`daily_max = 50000.00`, `monthly_max = 200000.00` … `single_transfer_max = <значение бизнеса>`. Значение нового порога в коде не найдено — **требует уточнения**"},
+        {"atom": "c", "status": "есть", "quote": "Свойства `limits.daily-max` / `limits.monthly-max` перестают быть источником истины для решения; допустимо использовать их только как значения для начальной миграции."}
+      ]
+    },
+    {
+      "id": "K5-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Обоснование: значения лимитов сегодня принадлежат `limit-service` (`application.yml`, `LimitLedger`), учёт использования — тоже (`limitdb`)."},
+        {"atom": "b", "status": "есть", "quote": "У `limit-service` вообще нет HTTP-слоя (`limit-service/pom.xml` — `spring-boot-starter`, без web/validation; в `docker-compose.yml` у сервиса нет `ports`)"},
+        {"atom": "c", "status": "есть", "quote": "Эндпоинт: **GET /limits** … Эндпоинт: **PUT /limits** … Описание: атомарно заменить значения всех трёх лимитов."},
+        {"atom": "d", "status": "есть", "quote": "`> 0`, ≤ 9999999999999.99, не более 2 знаков после запятой … Ошибка валидации: поле отсутствует/`null`, значение ≤ 0, превышен максимум, более 2 знаков после запятой, неверный тип/формат тела"}
+      ]
+    },
+    {
+      "id": "K5-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "`transfer-service` (API, БД `transferdb`, Streams-топология, матрица решений) | без изменений … `screening-service`, БД `screeningdb` | без изменений … `transfer-common` | без изменений"},
+        {"atom": "b", "status": "есть", "quote": "При повторном NEW по уже обработанному `transfer_id` система должна возвращать ранее сохранённое решение независимо от текущих настроек"}
+      ]
+    },
+    {
+      "id": "K5-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "`amount = 15000.00` (ровно порог), использование 0 → `limit-results`: `APPROVED` … `amount = 15000.01` (порог + 0.01) → `limit-results`: `DECLINED`"},
+        {"atom": "b", "status": "есть", "quote": "`amount = 60000.00` (превышены и порог одного перевода, и дневной лимит) → причина **`SINGLE_TRANSFER_LIMIT_EXCEEDED`**, не `DAILY_LIMIT_EXCEEDED`."},
+        {"atom": "c", "status": "есть", "quote": "последующий `GET /limits` возвращает их; **перезапуск сервиса не выполнялся** … `PUT /limits` с `singleTransferMax = 5000.00`, затем перевод 6000.00 → `DECLINED/SINGLE_TRANSFER_LIMIT_EXCEEDED`"},
+        {"atom": "d", "status": "есть", "quote": "`PUT /limits` с `singleTransferMax = 0` → 400; `GET /limits` возвращает прежний набор целиком (частичного применения нет)."}
+      ]
+    },
+    {
+      "id": "K5-M7",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Числовое значение порога «максимальная сумма одного перевода» по умолчанию … Какое значение ставить в начальную миграцию (для prod и для dev/test)?"},
+        {"atom": "b", "status": "есть", "quote": "пороги заданы в рублях? Нужно ли применять их к переводам в другой валюте (сейчас валюта при проверке лимитов игнорируется, конвертации в коде нет)?"},
+        {"atom": "c", "status": "есть", "quote": "кто может менять лимиты? Аутентификация/авторизация в проекте отсутствует — нужно ли их вводить в рамках этой задачи?"},
+        {"atom": "d", "status": "есть", "quote": "Нужна ли история изменений (кто, когда, старое → новое значение) и эндпоинт её просмотра?"},
+        {"atom": "e", "status": "есть", "quote": "Судьба уже принятых решений при уменьшении лимитов … ранее одобренные/зарезервированные переводы не пересматриваются и не отзываются? … допускается состояние `dailyUsed > dailyMax`"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K5-S1", "status": "есть", "quote": "Лимиты — не его домен: понадобится либо доступ в чужую БД `limitdb`, либо синхронный вызов/команда в `limit-service` … C. Отдельный сервис настроек | Изоляция админ-функции | Новый модуль"},
+    {"id": "K5-S2", "status": "нет", "quote": ""},
+    {"id": "K5-S3", "status": "есть", "quote": "валидировать на входе `transfer-service` (400/422) … дублирование бизнес-правила в двух сервисах, необходимость читать чужие настройки … Рекомендуется только асинхронная проверка в `limit-service`."},
+    {"id": "K5-S4", "status": "есть", "quote": "Единичный перевод на 50 000.00 при нулевом использовании проходит и «съедает» весь дневной лимит. … Причина отказа крупного единичного перевода сегодня — `DAILY_LIMIT_EXCEEDED`"},
+    {"id": "K5-S5", "status": "есть", "quote": "Аутентификация/авторизация отсутствуют во всех сервисах … Новый `PUT /limits` фактически открывает управление бизнес-правилами отклонения переводов всем, кто имеет сетевой доступ к порту."},
+    {"id": "K5-S6", "status": "есть", "quote": "разойдутся более чем на 10 с (например, из-за задержки чтения настроек или рестарта сервиса во время теста) … итоговый статус не сформируется … Хранилище настроек недоступно в момент обработки NEW"},
+    {"id": "K5-S7", "status": "нет", "quote": ""},
+    {"id": "K5-S8", "status": "есть", "quote": "Согласованность лимитов … обязательно ли `singleTransferMax ≤ dailyMax ≤ monthlyMax`?"},
+    {"id": "K5-S9", "status": "есть", "quote": "Валюта игнорируется при проверке лимитов … Новое правило унаследует дефект: порог, задуманный в рублях, будет применяться к переводу в любой валюте."},
+    {"id": "K5-S10", "status": "есть", "quote": "Заблокированный отправитель (id = 5), `amount = 20000.00` … итог `DENIED` … Повторное событие NEW по id из теста 24 после изменения лимитов → возвращается ранее сохранённое решение"}
+  ],
+  "errors": [
+    {
+      "quote": "Копировать подход `transfer-service` нежелательно: `ApiExceptionHandler` перехватывает `Exception` и всегда отдаёт 500",
+      "category": "ложная_аномалия",
+      "etalon_ref": "T4; раздел 6; раздел 8 («503 превращается в 500»)",
+      "code_ref": "transfer-service ApiExceptionHandler (extends ResponseEntityExceptionHandler, handleUnexpected); TransferController.publishNew, TransferController.duplicate",
+      "explanation": "ApiExceptionHandler наследует ResponseEntityExceptionHandler: стандартные исключения MVC (ошибки валидации — 400, ResponseStatusException(503) из publishNew) обрабатываются им со своими кодами, @ExceptionHandler(Exception.class) ловит только прочие исключения; 409 формирует сам контроллер. «Всегда 500» неверно."
+    },
+    {
+      "quote": "тексты `INTERNAL_ERROR` и `KAFKA_UNAVAILABLE` (`TransferController`) сохранены с нарушенной кодировкой (mojibake)",
+      "category": "ложная_аномалия",
+      "etalon_ref": "раздел 6 (тексты 409, 500 и 503 на русском); T4",
+      "code_ref": "transfer-service ApiExceptionHandler.INTERNAL_ERROR; TransferController.KAFKA_UNAVAILABLE",
+      "explanation": "Константы содержат корректный русский текст («Внутренняя ошибка сервера, повторите запрос позже», «Kafka недоступна, перевод сохранён — повторите запрос с тем же id»); нарушенной кодировки в коде нет. К тому же INTERNAL_ERROR объявлена в ApiExceptionHandler, а не в TransferController."
+    },
+    {
+      "quote": "`single_transfer_max` | DECIMAL(15,2) | NOT NULL, CHECK (`> 0`) … минимум строго больше нуля?",
+      "category": "неточность",
+      "etalon_ref": "раздел 10, «Штраф»: решение в схеме принято раньше открытого вопроса к бизнесу (−0,5)",
+      "code_ref": "н/п — противоречие внутри ответа (схема limit_settings и валидация PUT /limits против §8 п. 11); в limit-service db/changelog/001-create-tables.sql CHECK-ограничений нет",
+      "explanation": "Нижняя граница > 0 (а также максимум 9 999 999 999 999.99 и не более 2 знаков) зафиксирована в схеме, валидации PUT и тесте 3, а в §8 п. 11 эти же границы вынесены бизнесу как открытый вопрос. Типовой случай штрафа кейса 5, по весу — неточность."
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "Слишком длинный код причины приведёт к ошибке вставки → ретраи → `transfers.DLT`, перевод зависнет в NEW.",
+      "code_ref": "limit-service 001-create-tables.sql (reservations.reason VARCHAR(50)); LimitLedger.decide; KafkaErrorHandlingConfig.kafkaErrorHandler; transfer-service DecisionTopologyConfig.decisionStream",
+      "explanation": "Превышение длины даёт ошибку записи и откат транзакции decide; после 3 повторов DefaultErrorHandler отправляет NEW в transfers.DLT, ответа в limit-results нет, inner join не срабатывает — перевод остаётся NEW. В эталоне есть только требование уложиться в 50 символов, без этого сценария отказа."
+    },
+    {
+      "quote": "из compacted `transfers` промежуточный NEW может быть вытеснен итоговым статусом, и при переигрывании событий `LimitLedger.settle` получит финальный статус без резервирования (warn/skip)",
+      "code_ref": "limit-service LimitLedger.settle; TopicsConfig.transfersTopic (compact)",
+      "explanation": "settle при отсутствии резерва пишет WARN и выходит без изменений (при не-RESERVED — INFO); это следствие A3 для limit-service в эталоне не описано."
+    }
+  ],
+  "contamination": [],
+  "notes": "K5-M7: закрыты все пять атомов. S2 не засчитан: варианты хранения сравнены (таблица, yml+refresh, колонки sender_usage, топик), но аргумента про несколько экземпляров нет. S4 засчитан по совокупности двух утверждений §2; вывод «новый порог имеет смысл только ниже 50 000» прямо не сформулирован (есть лишь вопрос §8 п. 3). S6 засчитан по перезапуску сервиса + окну JOIN 10 с (§6 п. 3) и недоступности хранилища настроек; выкатка отдельно не описана. S7 не засчитан: итоги CANCELLED/DENIED и составная причина приведены, но расхождение «отклонять» и CANCELLED не отмечено. Сомнительное, в errors не внесено: §6 п. 6 преувеличивает риск оптимистических блокировок (concurrency не задан, слушатель limit-service обрабатывает партиции одним потоком, конфликты закрываются повторами DefaultErrorHandler, ср. B12); тест 26 («NEW на любую сумму > 0 → DAILY_LIMIT_EXCEEDED») противоречит собственному порядку SINGLE → DAILY для сумм выше singleTransferMax и при singleTransferMax = 15000 конфликтует с тестом 9 (это не граница); тест 27 ожидает решения «после восстановления» уже после ухода события в transfers.DLT, хотя DLT никто не читает (B1) — без повторного POST этого не произойдёт. Мелочи: SINGLE_TRANSFER_LIMIT_EXCEEDED — 30 символов, а не 29 (в VARCHAR(50) укладывается); в §1 посторонний токен «第三个» с переводом — языковой сбой, как нарушение формата не учтён; «HTTP-стек (web + validation)» — общая формулировка, не предписание зависимостей; §8 п. 12 «в коде аналогов нет» при @Version у SenderUsage — видимо, речь об условных запросах API. Утверждение о mojibake противоречит code.txt (корректная кириллица); возможен артефакт кодировки на входе модели. Расхождений эталона с кодом по проверяемым пунктам не обнаружено."
+}

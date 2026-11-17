@@ -1,0 +1,68 @@
+{
+  "case": "01",
+  "answer_id": "M",
+  "mandatory": [
+    {
+      "id": "K1-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Система приёма и автоматического решения по денежным переводам"},
+        {"atom": "b", "status": "есть", "quote": "проверяет отправителя по… дневным/месячным лимитам суммы"},
+        {"atom": "c", "status": "есть", "quote": "проверяет отправителя по списку блокировок"},
+        {"atom": "d", "status": "есть", "quote": "выносит итог — COMPLETED, CANCELLED или DENIED"}
+      ]
+    },
+    {
+      "id": "K1-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "событийно-ориентированное взаимодействие через Kafka… синхронных вызовов между сервисами нет"},
+        {"atom": "b", "status": "есть", "quote": "limit-service и screening-service независимо публикуют решения"},
+        {"atom": "c", "status": "есть", "quote": "агрегация решений двух проверок через Kafka Streams и публикация финального статуса"}
+      ]
+    },
+    {
+      "id": "K1-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Микросервисы (3 приложения + общая библиотека)"},
+        {"atom": "b", "status": "есть", "quote": "transfer-common | библиотека | нет"},
+        {"atom": "c", "status": "есть", "quote": "transfer-service | сервис | есть — REST /transfers… limit-service | сервис | нет… screening-service | сервис | нет"}
+      ]
+    },
+    {
+      "id": "K1-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Java 21"},
+        {"atom": "b", "status": "есть", "quote": "Spring Boot 3.4.1"},
+        {"atom": "c", "status": "есть", "quote": "Spring Kafka… Kafka Streams"},
+        {"atom": "d", "status": "есть", "quote": "Spring Data JPA / Hibernate… PostgreSQL JDBC… Liquibase"}
+      ]
+    },
+    {
+      "id": "K1-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfers | transfer-service: TransferController.publishNew (NEW) и Streams-топология… | limit-service — группа limit… screening-service — группа screening… transfer-service — группа transfer-tracker"},
+        {"atom": "b", "status": "есть", "quote": "limit-results | limit-service… | transfer-service: Streams join… и группа transfer-tracker… screening-results | screening-service… | transfer-service: Streams join… и группа transfer-tracker"}
+      ]
+    },
+    {
+      "id": "K1-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "confluentinc/cp-kafka:7.6.0"},
+        {"atom": "b", "status": "есть", "quote": "PostgreSQL 16-alpine ×3… transferdb… limitdb… screeningdb"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K1-S1", "status": "есть", "quote": "transfers.DLT | DeadLetterPublishingRecoverer всех трёх сервисов… limit-results.DLT, screening-results.DLT | объявлены только в transfer-service"},
+    {"id": "K1-S2", "status": "есть", "quote": "Consumer group Streams-приложения явно не задана (application.id в application.yml отсутствует) — требует уточнения"},
+    {"id": "K1-S3", "status": "есть", "quote": "KAFKA_AUTO_CREATE_TOPICS_ENABLE=false (топики создаются бинами NewTopic)… все бизнес-топики — 3 партиции, cleanup.policy=compact"},
+    {"id": "K1-S4", "status": "есть", "quote": "Общая модель события Transfer (record)… transfer-common внешних зависимостей не имеет"},
+    {"id": "K1-S5", "status": "нет", "quote": ""},
+    {"id": "K1-S6", "status": "есть", "quote": "один узел в KRaft… хост-порт 9092… сборка одного Dockerfile с ARG MODULE… healthcheck и depends_on: service_healthy… именованные тома у брокера и БД"}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {"quote": "OpenAPI 3.0.3 (только описание transfer-service/src/main/resources/openapi/transfer-api.yaml, кодогенерации в коде не найдено)", "code_ref": "transfer-api.yaml", "explanation": "Отмечено, что OpenAPI используется только как спецификация, без генерации кода."}
+  ],
+  "contamination": [],
+  "notes": ""
+}

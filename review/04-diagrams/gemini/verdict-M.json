@@ -1,0 +1,65 @@
+{
+  "case": "04",
+  "answer_id": "M",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Три Spring Boot‑сервиса... transfer-service... limit-service... screening-service"},
+        {"atom": "b", "status": "есть", "quote": "три отдельные PostgreSQL‑базы... transferdb... limitdb... screeningdb"},
+        {"atom": "c", "status": "есть", "quote": "один брокер Kafka... topic transfers... topic limit-results... topic screening-results"},
+        {"atom": "d", "status": "есть", "quote": "HTTP REST - POST /transfers... Kafka PLAINTEXT broker 29092 - produce transfers"},
+        {"atom": "e", "status": "есть", "quote": "Все междусервисные связи — только через топики Kafka, синхронный вход один: REST TransferController"}
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "TTS->>TDB: saveAndFlush(TransferEntity)...\n    TC->>K: template.send('transfers', id, Transfer.newTransfer(...)).get(10 секунд)\n    TC-->>Client: 201 Created"},
+        {"atom": "b", "status": "есть", "quote": "par limit-service\n...and screening-service"},
+        {"atom": "c", "status": "есть", "quote": "ST->>TDS: decide(limitResult, screeningResult)"},
+        {"atom": "d", "status": "есть", "quote": "K->>TEL: transfers, groupId=transfer-tracker, status=COMPLETED... K->>LEL: transfers, status=COMPLETED\n        LEL->>LS: onFinalStatus(transfer)"}
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "screening-service - отказ... send('screening-results', DECLINED, decidedBy=screening, messageInfo=SENDER_BLOCKED)"},
+        {"atom": "b", "status": "есть", "quote": "limit-service - резерв создан... usage.reserve(amount), Reservation(APPROVED, state=RESERVED)"},
+        {"atom": "c", "status": "есть", "quote": "LL->>LDB: usage.release(amount, reservedOn, today)... LL->>LDB: reservation.markReleased(), state=RELEASED"}
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "ER — transferdb... ER — limitdb... ER — screeningdb... transfers... transfer_history... sender_usage... reservations... blocked_senders... screening_checks"},
+        {"atom": "b", "status": "есть", "quote": "Единственная связь по внешнему ключу во всём проекте: transfer_history.transfer_id → transfers.id"},
+        {"atom": "c", "status": "есть", "quote": "Диаграмма 4г. ER — объекты вне БД (сообщения и DTO)... Transfer {"},
+        {"atom": "d", "status": "есть", "quote": "sender_usage ||..o{ reservations : \"логически по sender_id, FK нет\""}
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "[*] --> NEW : POST /transfers, TransferTrackingService.createTransfer, history stage NEW"},
+        {"atom": "b", "status": "есть", "quote": "NEW --> COMPLETED : Streams join, limit APPROVED и screening APPROVED... NEW --> CANCELLED : Streams join, limit DECLINED и screening APPROVED"},
+        {"atom": "c", "status": "есть", "quote": "COMPLETED --> [*]\n    CANCELLED --> [*]\n    DENIED --> [*]"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K4-S1", "status": "есть", "quote": "Если проверки не попали в окно JoinWindows 10 секунд, статус остаётся NEW, таймаута и компенсации в коде нет"},
+    {"id": "K4-S2", "status": "есть", "quote": "NONE → RESERVED (approve) → COMMITTED (markCommitted при COMPLETED) или RELEASED (markReleased при CANCELLED/DENIED); при decline сразу NONE"},
+    {"id": "K4-S3", "status": "есть", "quote": "and screening-service... Note over SEL: Резервов нет, только лог - nothing to do"},
+    {"id": "K4-S4", "status": "есть", "quote": "limit -->|\"Kafka produce - DLT...| t_dlt\n    screen -->|\"Kafka produce - DLT...| t_dlt\n    transfer -->|\"Kafka produce - DLT...| t_dlt"},
+    {"id": "K4-S5", "status": "есть", "quote": "DECIMAL amount \"DECIMAL(15,2) NOT NULL\"... BIGINT transfer_id FK \"REFERENCES transfers(id), UNIQUE(transfer_id, stage)\""},
+    {"id": "K4-S6", "status": "нет", "quote": ""},
+    {"id": "K4-S7", "status": "есть", "quote": "NEW --> CANCELLED : Streams join, неожиданный статус проверки, messageInfo UNEXPECTED_RESULT"}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {"quote": "русские тексты в файле в повреждённой кодировке", "code_ref": "ApiExceptionHandler", "explanation": "Модель заметила кириллицу во внутренней ошибке (вероятно, из-за особенностей чтения prompt'а)."}
+  ],
+  "contamination": [],
+  "notes": "Отличный ответ. Модель детально и точно построила диаграммы, не допустив типичных искажений архитектуры. Кардинальность 0..1 для reservations не указана явно (указано ||..o{, то есть ноль или много), поэтому K4-S6 не засчитывается."
+}

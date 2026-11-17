@@ -1,0 +1,93 @@
+{
+  "case": "03",
+  "answer_id": "M",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Эндпоинт: POST /transfers … Эндпоинт: GET /transfers … Эндпоинт: GET /transfers/{id}"},
+        {"atom": "b", "status": "есть", "quote": "201 | Создана новая запись перевода … 200 | Запись с таким id уже существует … 400 | Не пройдена валидация … 409 | Тот же id при других … 503 | Ошибка или таймаут отправки в Kafka"},
+        {"atom": "c", "status": "есть", "quote": "200 | Перевод найден, тело `{transfer, history}` … 404 | Перевод не найден — `ResponseEntity.notFound().build()`, тело отсутствует"},
+        {"atom": "d", "status": "есть", "quote": "id | body (application/json) | integer (int64) … amount | body (application/json) | number (decimal) … createdAt | string (date-time) … history | array of object"}
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Таблица: transfers (база: transferdb) … transfer_history (база: transferdb) … sender_usage (база: limitdb) … reservations (база: limitdb) … blocked_senders (база: screeningdb) … screening_checks"},
+        {"atom": "b", "status": "есть", "quote": "amount | DECIMAL(15,2) | — | — | — | да | — | — | Сумма перевода"},
+        {"atom": "c", "status": "есть", "quote": "Таблица: reservations (база: limitdb) … transfer_id | BIGINT | да | — | да (PK) … Таблица: screening_checks (база: screeningdb) … transfer_id | BIGINT | да | — | да (PK)"},
+        {"atom": "d", "status": "есть", "quote": "transfer_id | BIGINT | — | да → transfers(id) … FOREIGN KEY → transfers(id) | transfer_id"},
+        {"atom": "e", "status": "есть", "quote": "UNIQUE uq_transfer_history_stage | transfer_id, stage"},
+        {"atom": "f", "status": "есть", "quote": "sender_id | BIGINT | — | — | да (UNIQUE) | да | — | неявный UNIQUE-индекс, idx_blocked_senders_sender_id"}
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "id | Long … senderId | Long … recipientId | Long … amount | BigDecimal … currency | String … status | String … decidedBy | String … messageInfo | String … createdAt | LocalDateTime"},
+        {"atom": "b", "status": "есть", "quote": "`NEW` (transfers, публикация из API); `APPROVED`/`DECLINED` (limit-results, screening-results); `COMPLETED`/`CANCELLED`/`DENIED` (transfers, выход Streams)"}
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "partitions(3).compact() … 3 (`TopicsConfig.limitResultsTopic` во всех трёх сервисах) … 3 (`TopicsConfig.screeningResultsTopic` во всех трёх сервисах) … `compact`; retention в коде не задан"},
+        {"atom": "b", "status": "есть", "quote": "Ключ сообщения | `Long` — `Transfer.id` … Сериализация значения | `JsonSerializer` (`KafkaTemplate`), `JsonSerde<Transfer>` (Streams)"},
+        {"atom": "c", "status": "есть", "quote": "transfer-service: `TransferController.publishNew` (status `NEW`) … group `limit` … group `screening` … group `transfer-tracker` … limit-service: `LimitService.sendAndWait`"}
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "POST /transfers, ответ 500 | не описан (только 201, 200, 400, 409, 503)"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K3-S1", "status": "есть", "quote": "version | BIGINT | — | — | — | да | 0 | — | Счётчик оптимистичной блокировки (`@Version`, `SenderUsage.version`)"},
+    {"id": "K3-S2", "status": "нет", "quote": ""},
+    {"id": "K3-S3", "status": "есть", "quote": "`DeadLetterPublishingRecoverer` из `KafkaErrorHandlingConfig` limit-service, screening-service, transfer-service … для слушателя `transfer-tracker`; в limit-service топик не объявлен"},
+    {"id": "K3-S4", "status": "есть", "quote": "status | String | нет | `NEW` (transfers, публикация из API); `APPROVED`/`DECLINED` (limit-results, screening-results); `COMPLETED`/`CANCELLED`/`DENIED` (transfers, выход Streams)"},
+    {"id": "K3-S5", "status": "есть", "quote": "state | `RESERVED`, `COMMITTED`, `RELEASED`, `NONE` (`Reservation.STATE_*`)"},
+    {"id": "K3-S6", "status": "есть", "quote": "group = `application.id` (явно не задан: `spring.kafka.streams.application-id` отсутствует, используется `spring.application.name=transfer-service`)"},
+    {"id": "K3-S7", "status": "есть", "quote": "GET /transfers/{id}, ответ 400 | не описан … Transfer.createdAt, Transfer.updatedAt | `type: string`, `format` не указан … список `required` не задан"},
+    {"id": "K3-S8", "status": "нет", "quote": ""},
+    {"id": "K3-S9", "status": "нет", "quote": ""}
+  ],
+  "errors": [
+    {
+      "quote": "createdAt | LocalDateTime | нет | Момент создания перевода; JSR-310 … \"2026-11-17T10:15:30\"",
+      "category": "неточность",
+      "etalon_ref": "4.4; раздел 8 (Частые искажения: «createdAt в Kafka — ISO-строка»)",
+      "code_ref": "application.yml всех сервисов (spring.kafka.producer.value-serializer: JsonSerializer); DecisionTopologyConfig.decisionStream (new JsonSerde<>(Transfer.class)); KafkaErrorHandlingConfig.kafkaErrorHandler (new JsonSerializer<>())",
+      "explanation": "JsonSerializer и JsonSerde создаются по имени класса или через new и используют собственный ObjectMapper spring-kafka, а не ObjectMapper Spring Boot. LocalDateTime в сообщениях Kafka сериализуется массивом [год, месяц, день, час, мин, сек, нано], а не ISO-строкой. ISO-строка верна только для REST-ответов."
+    },
+    {
+      "quote": "`summary`/`description` в yaml сохранены в искажённой кодировке (mojibake) | Аналогично искажены строковые константы `TransferController.KAFKA_UNAVAILABLE`",
+      "category": "ложная_аномалия",
+      "etalon_ref": "0.3; 6.1 (выдуманные расхождения)",
+      "code_ref": "transfer-service/src/main/resources/openapi/transfer-api.yaml (summary операций); TransferController.KAFKA_UNAVAILABLE, TransferController.duplicate; ApiExceptionHandler.INTERNAL_ERROR",
+      "explanation": "В code.txt кириллица записана корректно. Это summary «Создать перевод», «Получить все переводы», «Получить перевод по ID с историей» и константы «Kafka недоступна, перевод сохранён — …», «Перевод с id=… уже существует с другими параметрами», «Внутренняя ошибка сервера, повторите запрос позже». Искажения кодировки нет, дефект выдуман."
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "`DelegatingByTypeSerializer`: `byte[]` → `ByteArraySerializer`, `Long` → `LongSerializer`",
+      "code_ref": "KafkaErrorHandlingConfig.keySerializer (transfer-service, limit-service, screening-service)",
+      "explanation": "Ключ записи в DLT сериализуется DelegatingByTypeSerializer. При ошибке десериализации ключа уходят исходные байты (byte[]), в остальных случаях — Long."
+    },
+    {
+      "quote": "Общий формат тела ошибки (`ProblemDetail`, application/problem+json) … type | string (URI) … detail | string … instance | string (URI)",
+      "code_ref": "ApiExceptionHandler (extends ResponseEntityExceptionHandler, handleUnexpected → ProblemDetail); TransferController.duplicate (ProblemDetail 409)",
+      "explanation": "Тела ошибок 400/409/500/503 — ProblemDetail (RFC 7807) с полями type, title, status, detail, instance. Структура описана верно, в эталоне её нет."
+    },
+    {
+      "quote": "Базовый URL / servers | секция `servers` отсутствует",
+      "code_ref": "transfer-service/src/main/resources/openapi/transfer-api.yaml",
+      "explanation": "В контракте действительно нет секции servers. Сервис слушает порт 8080: server.port не задан, порт опубликован в docker-compose.yml. Кандидат в список неполноты контракта."
+    }
+  ],
+  "contamination": [],
+  "notes": "K3-M3(b) и K3-S4 закрыты одной строкой таблицы, но разными фактами: перечень значений status закрывает M3(b), распределение трёх наборов по каналам в одном строковом поле закрывает S4. K3-M5 закрыт расхождением O1 (500); K3-S7 — O2, O4 и O5 (неявно также O7). K3-S2 не засчитан: в таблицах limitdb и screeningdb FK обозначен прочерком, но отсутствие FK и логический характер связей явно не названы. K3-S8 не засчитан (пограничный случай): есть лишь общая строка «Заголовки типов сообщений … значения по умолчанию JsonSerializer/JsonDeserializer», заголовок __TypeId__ и его роль не названы. K3-S9 не засчитан: пример createdAt в Kafka дан ISO-строкой, это записано как неточность. Утверждение о mojibake противоречит code.txt и записано как ложная аномалия. Модель указала ровно те строки, где есть кириллица; возможно, ей передали входной файл в искажённой кодировке, стоит проверить вход эксперимента. Строки раздела 4 про тексты Problem.detail и неподключённый контракт (C6) верны по коду, в O-список не входят. В условии кода 400 упомянут spring.mvc.problemdetails.enabled=true. При собственном наследнике ResponseEntityExceptionHandler это свойство на обработку не влияет, но основной механизм назван верно, поэтому в ошибки не записано. «FixedBackOff(1000 мс, 3 попытки)» передаёт имя параметра maxAttempts (фактически 3 повтора), ошибкой не считано. Расхождений эталона с кодом не обнаружено."
+}

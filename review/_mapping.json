@@ -59,6 +59,11 @@
       "source": "experiment/01-recon/answer-gigachat-3.5-ultra-reasoning.md",
       "model": "gigachat-3.5-ultra-reasoning",
       "markers_removed": 0
+    },
+    "M": {
+      "source": "experiment/01-recon/answer-qwen-4-max-thinking.md",
+      "model": "qwen-4-max-thinking",
+      "markers_removed": 0
     }
   },
   "02": {
@@ -120,6 +125,11 @@
     "L": {
       "source": "experiment/02-business-logic/answer-gigachat-3.5-ultra-reasoning.md",
       "model": "gigachat-3.5-ultra-reasoning",
+      "markers_removed": 0
+    },
+    "M": {
+      "source": "experiment/02-business-logic/answer-qwen-4-max-thinking.md",
+      "model": "qwen-4-max-thinking",
       "markers_removed": 0
     }
   },
@@ -183,6 +193,11 @@
       "source": "experiment/03-specs/answer-gigachat-3.5-ultra-reasoning.md",
       "model": "gigachat-3.5-ultra-reasoning",
       "markers_removed": 0
+    },
+    "M": {
+      "source": "experiment/03-specs/answer-qwen-4-max-thinking.md",
+      "model": "qwen-4-max-thinking",
+      "markers_removed": 0
     }
   },
   "04": {
@@ -245,6 +260,11 @@
       "source": "experiment/04-diagrams/answer-gigachat-3.5-ultra-reasoning.md",
       "model": "gigachat-3.5-ultra-reasoning",
       "markers_removed": 0
+    },
+    "M": {
+      "source": "experiment/04-diagrams/answer-qwen-4-max-thinking.md",
+      "model": "qwen-4-max-thinking",
+      "markers_removed": 0
     }
   },
   "05": {
@@ -306,6 +326,11 @@
     "L": {
       "source": "experiment/05-change-request/answer-gigachat-3.5-ultra-reasoning.md",
       "model": "gigachat-3.5-ultra-reasoning",
+      "markers_removed": 0
+    },
+    "M": {
+      "source": "experiment/05-change-request/answer-qwen-4-max-thinking.md",
+      "model": "qwen-4-max-thinking",
       "markers_removed": 0
     }
   }

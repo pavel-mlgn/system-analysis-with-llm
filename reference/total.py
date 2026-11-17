@@ -17,6 +17,7 @@ NAMES = {
     "claude-fable-5.2-max": "Claude Fable 5.2 Max",
     "alice-ai-expert": "Алиса AI Эксперт",
     "gigachat-3.5-ultra-reasoning": "GigaChat 3.5 Ultra Reasoning",
+    "qwen-4-max-thinking": "Qwen 4 Max Thinking",
 }
 CASES = ["01-recon", "02-business-logic", "03-specs", "04-diagrams", "05-change-request"]
 
