@@ -1,0 +1,108 @@
+{
+  "case": "02",
+  "answer_id": "B",
+  "mandatory": [
+    {
+      "id": "K2-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "ТОЧКА ВХОДА: `TransferController.create()` … HTTP `POST /transfers`, тело — `TransferRequest`."},
+        {"atom": "b", "status": "есть", "quote": "ТОЧКА ВХОДА: `TransferController.all()` … HTTP `GET /transfers`. … ТОЧКА ВХОДА: `TransferController.getById()` … HTTP `GET /transfers/{id}`."},
+        {"atom": "c", "status": "есть", "quote": "ТОЧКА ВХОДА: `TransferEventListener.onEvent()` … входящее сообщение из топиков `transfers`, `limit-results`, `screening-results`; группа `transfer-tracker`."},
+        {"atom": "d", "status": "есть", "quote": "ТОЧКА ВХОДА: `DecisionTopologyConfig.decisionStream()` … потоковая обработка: соединение событий из `limit-results` и `screening-results` по ключу перевода."},
+        {"atom": "e", "status": "есть", "quote": "`TransferEventsListener.onEvent()` в limit-service … Если статус `NEW` — принять решение по лимитам. … Если статус не `NEW` — урегулировать ранее зарезервированную сумму."},
+        {"atom": "f", "status": "есть", "quote": "ТОЧКА ВХОДА: `TransferEventsListener.onEvent()` в screening-service … входящее сообщение из топика `transfers`; группа `screening`."}
+      ]
+    },
+    {
+      "id": "K2-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "| limit status | screening status | Итог | decidedBy | messageInfo | … | APPROVED | APPROVED | COMPLETED | null | null |"},
+        {"atom": "b", "status": "есть", "quote": "| limit status | screening status | Итог | decidedBy | messageInfo | … | APPROVED | DECLINED | CANCELLED | screening | screening.messageInfo |"},
+        {"atom": "c", "status": "есть", "quote": "| limit status | screening status | Итог | decidedBy | messageInfo | … | DECLINED | APPROVED | CANCELLED | limit | limit.messageInfo |"},
+        {"atom": "d", "status": "есть", "quote": "| limit status | screening status | Итог | decidedBy | messageInfo | … | DECLINED | DECLINED | DENIED | null | `limit.messageInfo + \"; \" + screening.messageInfo` |"}
+      ]
+    },
+    {
+      "id": "K2-M3",
+      "atoms": [
+        {"atom": "a", "status": "нет", "quote": ""},
+        {"atom": "b", "status": "есть", "quote": "БП-31: Если дневное использование + сумма > дневного максимума, перевод отклоняется … БП-32: Иначе, если месячное использование + сумма > месячного максимума, перевод отклоняется"},
+        {"atom": "c", "status": "есть", "quote": "| dailyUsed + amount <= dailyMax и monthlyUsed + amount <= monthlyMax | APPROVED | null | RESERVED | dailyUsed и monthlyUsed увеличиваются на amount |"},
+        {"atom": "d", "status": "есть", "quote": "БП-30: Перед проверкой лимитов выполняется ленивый сброс дневного и месячного использования, если сменился день/месяц."},
+        {"atom": "e", "status": "есть", "quote": "БП-29: Если сумма перевода `null` или `<= 0`, перевод отклоняется с причиной `INVALID_AMOUNT`."}
+      ]
+    },
+    {
+      "id": "K2-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "БП-33: Иначе перевод одобряется, сумма резервируется в дневном и месячном использовании."},
+        {"atom": "b", "status": "есть", "quote": "БП-37: При финальном статусе `COMPLETED` резерв помечается `COMMITTED`."},
+        {"atom": "c", "status": "есть", "quote": "БП-38: При финальном статусе `CANCELLED` или `DENIED` зарезервированная сумма освобождается … резерв помечается `RELEASED`."},
+        {"atom": "d", "status": "есть", "quote": "БП-36: При урегулировании, если резерв не в состоянии `RESERVED`, обработка пропускается."}
+      ]
+    },
+    {
+      "id": "K2-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Если статус `NEW` — выполнить проверку отправителя. … БП-44: Если отправитель не заблокирован, проверка одобряется."},
+        {"atom": "b", "status": "есть", "quote": "БП-43: Если отправитель находится в списке заблокированных, проверка отклоняется с причиной `SENDER_BLOCKED`."},
+        {"atom": "c", "status": "есть", "quote": "БП-41: При получении события не `NEW` ничего не делается."}
+      ]
+    },
+    {
+      "id": "K2-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "`201 Created` — перевод создан … `200 OK` — перевод уже существует, параметры совпадают. … `409 Conflict` — перевод с таким `id` уже есть, но параметры другие."},
+        {"atom": "b", "status": "есть", "quote": "БП-28: … если по `transferId` уже есть запись, возвращается ранее сохранённое решение. … БП-42: Если по `transferId` уже есть запись проверки, возвращается ранее сохранённый результат."},
+        {"atom": "c", "status": "есть", "quote": "БП-17: Результат этапа `LIMIT`/`SCREENING` записывается только если перевод существует и запись по этому этапу ещё не существует."}
+      ]
+    },
+    {
+      "id": "K2-M7",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "| А-2 | Окно join 10 секунд без grace period | … | Финальное решение не формируется, перевод остаётся в `NEW` | Критичная |"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K2-S1", "status": "нет", "quote": ""},
+    {"id": "K2-S2", "status": "нет", "quote": ""},
+    {"id": "K2-S3", "status": "есть", "quote": "Компактизация топика `transfers` | Consumer group запускается позже, после перезаписи `NEW` финальным статусом | limit/screening могут не увидеть `NEW` и не создать резерв/проверку"},
+    {"id": "K2-S4", "status": "нет", "quote": ""},
+    {"id": "K2-S5", "status": "нет", "quote": ""},
+    {"id": "K2-S6", "status": "нет", "quote": ""},
+    {"id": "K2-S7", "status": "есть", "quote": "БП-24: Во всех остальных комбинациях статусов финальный статус `CANCELLED`, `decidedBy=null`, `messageInfo=\"UNEXPECTED_RESULT: limit=..., screening=...\"`."},
+    {"id": "K2-S8", "status": "есть", "quote": "дневное и месячное использование уменьшаются с учётом даты резерва, но не ниже нуля … | не совпадает | — | не уменьшается | — | … | — | другой месяц | — | не уменьшается |"},
+    {"id": "K2-S9", "status": "есть", "quote": "А-7 | Идемпотентность по `transferId` без проверки параметров | В топик попадает `NEW` с тем же `id`, но другими суммой/отправителем | limit/screening вернут старое решение"}
+  ],
+  "errors": [
+    {
+      "quote": "`ApiExceptionHandler` перехватывает `ResponseStatusException` и возвращает `500` вместо `503`",
+      "category": "ложная_аномалия",
+      "etalon_ref": "T4 (раздел 2.1); раздел 6.1 «Выдуманные расхождения»; раздел 8 «Частые искажения»; чек-лист кейса 2, специфичные штрафы («503 -> 500»)",
+      "code_ref": "transfer-service: controller/ApiExceptionHandler (extends ResponseEntityExceptionHandler, handleUnexpected); controller/TransferController.publishNew",
+      "explanation": "publishNew бросает ResponseStatusException(503). ApiExceptionHandler наследует ResponseEntityExceptionHandler, чей обработчик ErrorResponseException специфичнее, чем @ExceptionHandler(Exception.class) в handleUnexpected, поэтому клиент получает 503 problem+json с текстом KAFKA_UNAVAILABLE, а не 500. Сам ответ в БП-6 и в исходах POST верно указывает 503."
+    },
+    {
+      "quote": "| да | RESERVED | COMPLETED | markCommitted | … Перед этим выполняется `lazyReset(today)`. … | А-9 | `setFailIfSendResultIsError(false)` | DLT недоступен |",
+      "category": "нарушение_формата",
+      "etalon_ref": "Раздел 0.3 (нарушение ограничений промпта); чек-лист кейса 2, специфичные штрафы (описание терминами кода вместо бизнес-языка)",
+      "code_ref": "Не применимо (правило prompt.md); использованы идентификаторы limit-service: Reservation.markCommitted/markReleased, SenderUsage.lazyReset, поля dailyUsed/monthlyUsed; KafkaErrorHandlingConfig",
+      "explanation": "Правила промпта: описание «на языке бизнеса (без терминов из кода)», ссылки на код — «только в скобках как справку, не как основу описания». В таблицах решений 2.2, 2.5, 2.6 и в описаниях аномалий (А-1, А-9, А-16, А-17, А-18) условия и действия заданы идентификаторами кода (dailyUsed + amount > dailyMax, markCommitted, markReleased, lazyReset(today), setFailIfSendResultIsError(false)) вместо бизнес-формулировок. Одна запись на тип нарушения."
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "| А-11 | Нет проверки допустимости финального статуса | В `transfers` приходит неожиданный статус | Он может быть записан как `FINAL` |",
+      "code_ref": "transfer-service: listener/TransferEventListener.onEvent (ветка \"transfers\": любой статус, кроме NEW, передаётся в applyFinalStatus); service/TransferTrackingService.applyFinalStatus (setStatus(result.status()) без проверки допустимых значений)",
+      "explanation": "Трекер принимает любой статус, отличный от NEW, как финальный и записывает его в transfers.status и в историю FINAL. В эталоне это есть как правило T9, но не как аномалия или риск."
+    },
+    {
+      "quote": "Ошибка публикации результата после сохранения в БД | … | Решение сохранено, но не опубликовано; после ретраев сообщение уходит в DLT, перевод не финализируется",
+      "code_ref": "screening-service: ScreeningService.onNewTransfer/sendAndWait, ScreeningJournal.check (@Transactional); limit-service: LimitService.onNewTransfer/sendAndWait, LimitLedger.decide (@Transactional); KafkaErrorHandlingConfig.kafkaErrorHandler (FixedBackOff(1000, 3) и DLT)",
+      "explanation": "Решение коммитится до отправки ответа; при сбое отправки IllegalStateException -> 3 повтора -> исходная запись уходит в transfers.DLT, ответа нет, JOIN не срабатывает. Для limit-service это есть в эталоне (L10, A1, B1), для screening-service симметричный случай явно не описан."
+    }
+  ],
+  "contamination": [],
+  "notes": "K2-M3(a): числовые значения лимитов (50 000 / 200 000) в ответе не названы, только «дневной/месячный максимум» и dailyMax/monthlyMax. K2-M3(c) засчитан по строке таблицы 2.2 с явным «<= dailyMax … APPROVED» (формула, а не словесная формулировка). K2-M5(a) засчитан по исчерпывающему правилу «отправитель заблокирован -> отказ, не заблокирован -> одобрение» (БП-43/44, табл. 2.3); слова «только» и упоминания получателя нет. K2-S1 не закрыт: в А-2 есть только «перевод остаётся в NEW», нет зависшего резерва RESERVED и восстановления повторным POST. K2-S2 не закрыт: 503 и сохранённый перевод описаны как правило (БП-6), а не как аномалия; А-3 относится к сбою отправки ответов limit/screening (по содержанию B1 и часть A1/L10), а не к POST в transfer-service — пограничное решение. K2-S6 не закрыт: таблицы 2.1 и 2.5 раздельные, связки «ответы -> итог -> резерв» (в том числе что при отказе limit резерва нет и ветка DENIED недостижима) нет. K2-S9 закрыт А-7 (B14); А-13 близка к B7, но без «нескольких финалов». Прочие верные аномалии, уже покрытые эталоном: А-6 = B12, А-8 = B4, А-9 = B1/5.2, А-12 = B9, А-17 = B2, А-4 = C8/S5, А-14 и А-15 = L3, А-18 = T7. А-1 противоречит собственным БП-6 и исходам ответа (там 503). Не записаны в errors как условные утверждения о существующих ветках кода: А-5 (DECLINED в обоих сервисах всегда с причиной, null возможен только для сообщения в обход сервисов), А-16 (sender_usage сохраняется в одной транзакции с резервом RESERVED, штатно сценарий недостижим), сценарий А-18 «запись исчезла» (удаления переводов в коде нет). Также не записаны: БП-8 не называет amount обязательным (пропуск, не противоречие); табл. 2.2 «usage не меняется» при отказе по лимиту — упрощение (строка sender_usage сохраняется, возможен ленивый сброс); А-9 «без явной ошибки» (по эталону при сбое публикации в DLT пишется ERROR, исключения нет). Шкала серьёзности: у А-3 и А-4 «Высокая» — вне шкалы промпта, не штрафуется. Нарушение формата записано за термины кода как основу описания в таблицах решений и реестре; разделы «Алгоритм» точек входа написаны бизнес-языком, поэтому решение пограничное. Маркеров контаминации нет. Расхождений эталона с кодом по кейсу 02 не найдено."
+}

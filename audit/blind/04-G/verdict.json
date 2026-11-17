@@ -1,0 +1,105 @@
+{
+  "case": "04",
+  "answer_id": "G",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "subgraph transfer-service[\"transfer-service (Spring Boot 3.4.1, Java 21)\"] … limit-service (Spring Boot 3.4.1, Java 21) … screening-service (Spring Boot 3.4.1, Java 21)"},
+        {"atom": "b", "status": "есть", "quote": "TDB[(\"transfer-db<br/>transferdb<br/>порт 5434\")] … LDB[(\"limit-db<br/>limitdb<br/>порт 5432\")] … SDB[(\"screening-db<br/>screeningdb<br/>порт 5433\")]"},
+        {"atom": "c", "status": "есть", "quote": "subgraph broker[\"Kafka (cp-kafka 7.6.0)\"] … topic: transfers<br/>(3 партиции, compact) … topic: limit-results<br/>(3 партиции, compact) … topic: screening-results<br/>(3 партиции, compact)"},
+        {"atom": "d", "status": "есть", "quote": "Client -->|\"HTTP/REST (порт 8080)\"| TC … TC -->|\"JDBC\"| TDB … TC -->|\"Kafka producer: topic transfers\"| T … T -->|\"Kafka consumer, groupId=limit\"| LEL"},
+        {"atom": "e", "status": "есть", "quote": "TC -->|\"Kafka producer: topic transfers\"| T … T -->|\"Kafka consumer, groupId=limit\"| LEL … LS -->|\"Kafka producer: topic limit-results\"| LR … LR -->|\"Kafka Streams source\"| TDL"}
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "TTS->>DB: INSERT transfers (status=NEW)<br/>INSERT transfer_history (stage=NEW) … TC->>K: send(\"transfers\", id, Transfer[status=NEW]) … TC-->>C: 201 Created (TransferEntity)"},
+        {"atom": "b", "status": "нет", "quote": ""},
+        {"atom": "c", "status": "есть", "quote": "K->>KS: stream join limit-results + screening-results<br/>(JoinWindows 10 сек) … KS->>KS: TRANSFER_DECISION_SERVICE.decide():<br/>APPROVED + APPROVED → COMPLETED"},
+        {"atom": "d", "status": "есть", "quote": "K->>TE: onEvent(Transfer[COMPLETED])<br/>groupId=transfer-tracker … TE->>TTS: applyFinalStatus(Transfer[COMPLETED]) … K->>L: onEvent(Transfer[COMPLETED])"}
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "L->>K: send(\"limit-results\", id, Transfer[DECLINED]) … S->>K: send(\"screening-results\", id, Transfer[APPROVED]) … decide(): DECLINED + APPROVED<br/>→ CANCELLED, decidedBy=\"limit\""},
+        {"atom": "b", "status": "есть", "quote": "при недоступности Kafka в `TransferController.publishNew` сущность уже сохранена в БД, клиент получает `503`"},
+        {"atom": "c", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Три физические базы данных и один неперсистентный объект сообщения … TRANSFERS ||--|| TRANSFER_HISTORY … SENDER_USAGE ||--o{ RESERVATIONS … BLOCKED_SENDERS ||--o{ SCREENING_CHECKS"},
+        {"atom": "b", "status": "есть", "quote": "TRANSFERS ||--|| TRANSFER_HISTORY : \"fk: transfer_history.transfer_id → transfers.id\" … `TransferHistoryEntry.transferId` ↔ `transfers.id` — единственный настоящий FK (в transferdb)"},
+        {"atom": "c", "status": "есть", "quote": "один неперсистентный объект сообщения (`Transfer` — Java record, хранится только в Kafka) … TRANSFER_MESSAGE {"},
+        {"atom": "d", "status": "есть", "quote": "SENDER_USAGE ||--o{ RESERVATIONS : \"логически: reservations.sender_id (без FK)\" … BLOCKED_SENDERS ||--o{ SCREENING_CHECKS : \"логически: screening_checks.sender_id (без FK)\""}
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "[*] --> NEW : POST /transfers<br/>TransferController.create"},
+        {"atom": "b", "status": "есть", "quote": "APPROVED --> COMPLETED : TransferDecisionService.decide<br/>APPROVED + APPROVED … APPROVED --> CANCELLED : decide: APPROVED + DECLINED … DECLINED --> DENIED : decide: DECLINED + DECLINED"},
+        {"atom": "c", "status": "есть", "quote": "COMPLETED --> [*] … CANCELLED --> [*] … DENIED --> [*]"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K4-S1", "status": "нет", "quote": ""},
+    {"id": "K4-S2", "status": "есть", "quote": "`NONE` (declined) → финал; `RESERVED` → `COMMITTED` (при `COMPLETED`) или `RESERVED` → `RELEASED` (при `CANCELLED`/`DENIED`, с освобождением `SenderUsage`)"},
+    {"id": "K4-S3", "status": "нет", "quote": ""},
+    {"id": "K4-S4", "status": "нет", "quote": ""},
+    {"id": "K4-S5", "status": "есть", "quote": "decimal_15_2 amount … varchar_10 currency \"DEFAULT 'RUB'\" … varchar_20 stage \"UNIQUE (transfer_id, stage)\" … bigint sender_id \"UNIQUE\" … varchar_255 reason"},
+    {"id": "K4-S6", "status": "нет", "quote": ""},
+    {"id": "K4-S7", "status": "нет", "quote": ""}
+  ],
+  "errors": [
+    {
+      "quote": "L->>LDB: INSERT reservations (DECLINED/NONE) … usage.release(amount, ...)<br/>reservation.markReleased()<br/>(компенсация резерва) … UPDATE reservations (RELEASED)",
+      "category": "искажение",
+      "etalon_ref": "L11, L13; раздел 3, сценарий 2; раздел 8 («CANCELLED всегда возвращает лимит»); 9.3",
+      "code_ref": "limit-service LimitLedger.settle; Reservation.decline, Reservation.isReserved",
+      "explanation": "При отказе по лимиту резерв сохраняется в состоянии NONE, счётчики не увеличиваются. LimitLedger.settle при !reservation.isReserved() выходит без изменений («nothing to settle»): usage.release и markReleased не вызываются, перехода NONE → RELEASED нет. Возврат выполняется только для RESERVED (limit APPROVED + screening DECLINED). То же неверное утверждение есть в подводке к диаграмме 3: «уже выполненная лимитная резервация компенсируется»."
+    },
+    {
+      "quote": "T -->|\"Kafka Streams source\"| TDL",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "раздел 8, «Частые искажения» (transfer-service читает transfers); 5.3; раздел 1, каналы Kafka",
+      "code_ref": "transfer-service config/DecisionTopologyConfig.decisionStream",
+      "explanation": "Топология Kafka Streams читает только limit-results и screening-results (builder.stream), а transfers для неё — только выход (.to(\"transfers\")). Топик transfers читают группы limit, screening и transfer-tracker."
+    },
+    {
+      "quote": "TRANSFERS ||--|| TRANSFER_HISTORY : \"fk: transfer_history.transfer_id → transfers.id\"",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "4.1 (от 1 до 4 записей истории); 9.4",
+      "code_ref": "transfer-service db/changelog/001-create-tables.sql (uq_transfer_history_stage); HistoryStage; TransferTrackingService.createTransfer, recordServiceResult, applyFinalStatus",
+      "explanation": "Кардинальность 1:1 неверна: у перевода от 1 до 4 записей истории (этапы NEW, LIMIT, SCREENING, FINAL), уникальность задана по паре (transfer_id, stage), а не по transfer_id. Сам ответ на диаграмме 2 вставляет для одного перевода две записи истории (NEW и FINAL)."
+    },
+    {
+      "quote": "SENDER_USAGE ||--o{ RESERVATIONS … BLOCKED_SENDERS ||--o{ SCREENING_CHECKS",
+      "category": "неточность",
+      "etalon_ref": "4.2 (у резерва 0..1 строки счётчиков); 9.4 («1 вместо 0..1» — неточность)",
+      "code_ref": "limit-service LimitLedger.decide; screening-service ScreeningJournal.check",
+      "explanation": "Сторона «один» в логических связях показана обязательной (ровно 1) вместо 0..1. При INVALID_AMOUNT для нового отправителя резерв сохраняется без строки sender_usage (ранний return до загрузки счётчиков). Запись screening_checks создаётся и для отправителя, которого нет в blocked_senders (результат APPROVED)."
+    },
+    {
+      "quote": "SENDER_USAGE ||--o{ RESERVATIONS : \"логически: reservations.sender_id (без FK)\"",
+      "category": "нарушение_формата",
+      "etalon_ref": "prompt.md, диаграмма 4 (логические связи — пунктирной); 9.4",
+      "code_ref": "limit-service и screening-service db/changelog/001-create-tables.sql (внешних ключей между таблицами нет, связи логические)",
+      "explanation": "Промпт требует рисовать логические связи пунктирной линией. В обеих ER-диаграммах (limitdb и screeningdb) они нарисованы сплошной (`--` вместо `..`), так же как связь по внешнему ключу. Одна запись на тип нарушения."
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "клиент получает `503` с сообщением «Kafka недоступна, перевод сохранён — повторите запрос с тем же id»",
+      "code_ref": "transfer-service TransferController (константа KAFKA_UNAVAILABLE, метод publishNew)",
+      "explanation": "Текст detail ответа 503 дословно совпадает с константой в коде. В эталоне (T4, раздел 6) сам текст не приведён: сказано только, что он на русском."
+    }
+  ],
+  "contamination": [],
+  "notes": "1) K4-M3: в основном сценарии (отказ по лимиту) резерв не создаётся (NONE), показанная компенсация не соответствует коду (см. errors). Атом (b) засчитан по дополнительному абзацу о техническом отказе (Kafka недоступна → 503, перевод сохранён в БД) по особому указанию для K4-M3; если засчитывать только сценарий, выбранный для диаграммы, (b) = «нет». Атом (c) не засчитан: верное описание возврата резерва есть только в диаграмме 5 («APPROVED --> CANCELLED … usage.release + markReleased») и в тексте про Reservation, а сам сценарий отказа утверждает ложную компенсацию. Ответ внутренне противоречив: диаграмма 5 для DECLINED + APPROVED верно пишет «нет резерва». 2) K4-S2 засчитан по текстовому перечню состояний Reservation (верен, NONE — конечное), хотя диаграмма 3 показывает переход NONE → RELEASED (учтён в errors). 3) K4-S3 не засчитан: трекер — отдельный участник (TransferEventListener), но то, что screening-service получает финал и только логирует его, не показано нигде; пограничный случай. 4) K4-S4 не засчитан: узел *.DLT есть, но связи идут от топиков, продюсеры не показаны. 5) K4-S5 засчитан по ядру: типы точные, есть PK, FK, UNIQUE, DEFAULT; NOT NULL не показан. 6) K4-M2(b): par и явной пометки о параллельности нет, limit и screening показаны последовательно. 7) Диаграмма 5: APPROVED и DECLINED нарисованы промежуточными состояниями Transfer, причём два параллельных ответа сведены в одно состояние. В errors не записано: подводка прямо называет их промежуточными результатами сервисов в limit-results/screening-results, и для сообщения Transfer это верно; у TransferEntity таких статусов нет (TransferTrackingService.recordServiceResult статус не меняет). При строгом чтении это случай из раздела 8 «статус перевода меняется на APPROVED / DECLINED» (−2) или «неверный переход состояния» (−1) — на решение человека. 8) Имена LIMIT_LEDGER.decide(), SCREENING_JOURNAL.check(), TRANSFER_DECISION_SERVICE.decide(), TRANSFER_MESSAGE в коде не встречаются: это иное написание реальных LimitLedger, ScreeningJournal, TransferDecisionService, Transfer (реальные имена даны в подписях участников). Расценено как стиль, а не как галлюцинация; при строгом чтении — нарушение правила промпта о реальных именах. Запись финала из Kafka Streams показана как send(\"transfers\", …), в коде это .to(\"transfers\"). 9) Не показаны (пропуски, не ошибки): запись трекером этапов LIMIT и SCREENING в историю, ветка «нет пары в окне 10 с», UNEXPECTED_RESULT. 10) ER-диаграммы не подписаны как 4а/4б и не названы по БД; между диаграммами 3 и 4 есть лишний абзац — в errors не записано. 11) Расхождений эталона с кодом по разделам 3, 4, 5, 8, 9 не найдено. Синтаксис Mermaid не оценивался."
+}

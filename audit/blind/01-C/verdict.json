@@ -1,0 +1,92 @@
+{
+  "case": "01",
+  "answer_id": "C",
+  "mandatory": [
+    {
+      "id": "K1-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Система принимает заявки на денежные переводы (отправитель, получатель, сумма, валюта) и автоматически решает, можно ли их провести."},
+        {"atom": "b", "status": "есть", "quote": "она проверяет, укладывается ли перевод в дневной и месячный лимиты отправителя"},
+        {"atom": "c", "status": "есть", "quote": "не заблокирован ли отправитель … Проверяет отправителя по списку заблокированных (таблица `blocked_senders`)."},
+        {"atom": "d", "status": "есть", "quote": "По итогам обеих проверок перевод получает финальный статус COMPLETED, CANCELLED или DENIED"}
+      ]
+    },
+    {
+      "id": "K1-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Между собой сервисы взаимодействуют только через Kafka … Вызовов между сервисами (HTTP, gRPC и т. п.) в коде не найдено."},
+        {"atom": "b", "status": "есть", "quote": "limit-service и screening-service параллельно проверяют его и пишут результаты в `limit-results` и `screening-results`"},
+        {"atom": "c", "status": "есть", "quote": "transfer-service объединяет их через Kafka Streams (join в окне 10 с) и публикует итоговый статус в `transfers`"}
+      ]
+    },
+    {
+      "id": "K1-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfer-common | библиотека … transfer-service | сервис … limit-service | сервис … screening-service | сервис"},
+        {"atom": "b", "status": "есть", "quote": "transfer-common | библиотека | нет | Общий контракт сообщений Kafka: record `com.example.common.Transfer`."},
+        {"atom": "c", "status": "есть", "quote": "limit-service | сервис | нет (только Kafka) … screening-service | сервис | нет (только Kafka) … Единственный синхронный интерфейс — внешний REST API transfer-service."}
+      ]
+    },
+    {
+      "id": "K1-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Java 21"},
+        {"atom": "b", "status": "есть", "quote": "Spring Boot 3.4.1"},
+        {"atom": "c", "status": "есть", "quote": "Spring for Apache Kafka, Kafka Streams (только transfer-service) … Apache Kafka (Confluent `cp-kafka` 7.6.0)"},
+        {"atom": "d", "status": "есть", "quote": "Liquibase (formatted SQL), драйвер PostgreSQL … PostgreSQL 16"}
+      ]
+    },
+    {
+      "id": "K1-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "`transfers` | transfer-service: `TransferController.publishNew` (NEW) … limit-service (`limit`), screening-service (`screening` … transfer-service (`transfer-tracker`)"},
+        {"atom": "b", "status": "есть", "quote": "`limit-results` | limit-service: `LimitService.onNewTransfer` … `screening-results` | screening-service: … transfer-service: Kafka Streams¹ и `transfer-tracker`"}
+      ]
+    },
+    {
+      "id": "K1-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Apache Kafka: `confluentinc/cp-kafka:7.6.0`, один узел в режиме KRaft (broker + controller, без ZooKeeper)."},
+        {"atom": "b", "status": "есть", "quote": "с собственной БД у каждого сервиса … PostgreSQL 16 (`postgres:16-alpine`): три независимые БД — `transferdb` (порт хоста 5434), `limitdb` (5432) и `screeningdb` (5433)"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K1-S1", "status": "есть", "quote": "`transfers.DLT` | `KafkaErrorHandlingConfig` любого из трёх сервисов … `limit-results.DLT`, `screening-results.DLT` | `KafkaErrorHandlingConfig` transfer-service"},
+    {"id": "K1-S2", "status": "есть", "quote": "`application.id` Kafka Streams явно не задан. По умолчанию Spring Boot берёт `spring.application.name`, то есть `transfer-service`."},
+    {"id": "K1-S3", "status": "есть", "quote": "`cleanup.policy=compact` … Топики создают сами сервисы через бины `NewTopic` (объявления продублированы в `TopicsConfig` каждого сервиса), автосоздание в брокере отключено."},
+    {"id": "K1-S4", "status": "есть", "quote": "record `com.example.common.Transfer` … других зависимостей между модулями нет … сервисы наследуются от `spring-boot-starter-parent` 3.4.1, а у transfer-common родителя нет"},
+    {"id": "K1-S5", "status": "есть", "quote": "клиент сразу получает 201 со статусом NEW, а итог видит через `GET /transfers/{id}`"},
+    {"id": "K1-S6", "status": "есть", "quote": "один узел в режиме KRaft … `transferdb` (порт хоста 5434), `limitdb` (5432) и `screeningdb` (5433) … Образы трёх сервисов собираются одним `Dockerfile` (аргумент `MODULE`)"}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {
+      "quote": "Maven 3.9.9 (из образа сборки)",
+      "code_ref": "Dockerfile, стадии poms и build: FROM maven:3.9.9-eclipse-temurin-21",
+      "explanation": "Версия Maven определяется образом сборки; в эталоне версия Maven не указана."
+    },
+    {
+      "quote": "Версии Spring Kafka, Kafka Streams, Hibernate, Liquibase, драйвера PostgreSQL и Jackson в pom явно не указаны: их задаёт BOM Spring Boot 3.4.1.",
+      "code_ref": "transfer-service/pom.xml, limit-service/pom.xml, screening-service/pom.xml: зависимости без <version>, parent spring-boot-starter-parent 3.4.1",
+      "explanation": "Эталон говорит это только про spring-kafka и kafka-streams; у liquibase-core, postgresql, jackson-databind и jackson-datatype-jsr310 версии тоже не заданы, Hibernate приходит транзитивно через spring-boot-starter-data-jpa."
+    },
+    {
+      "quote": "API для ведения списка заблокированных в коде не найдено. Список заполняется миграцией `002-insert-test-data.sql` с тестовыми данными",
+      "code_ref": "screening-service: BlockedSenderRepository (только findBySenderId), ScreeningJournal.check (только чтение blocked_senders), pom.xml без web; db/changelog/002-insert-test-data.sql",
+      "explanation": "У screening-service нет HTTP-слоя и нет кода, который пишет в blocked_senders; единственный источник строк — миграция. В эталоне (C8, раздел 8) это сказано только косвенно."
+    },
+    {
+      "quote": "Кэши, Schema Registry и внешние HTTP-системы в коде не найдены.",
+      "code_ref": "docker-compose.yml (broker, три БД, три приложения); pom.xml сервисов (нет зависимостей кэша, HTTP-клиентов, Schema Registry); application.yml сервисов (JsonSerializer / JsonDeserializer)",
+      "explanation": "В развёртывании только Kafka и три PostgreSQL; сообщения сериализуются в JSON без реестра схем; HTTP-клиентов в коде нет."
+    },
+    {
+      "quote": "профиль Spring `docker` переключает адреса Kafka и БД на имена контейнеров",
+      "code_ref": "application-docker.yml каждого сервиса (spring.kafka.bootstrap-servers: broker:29092; spring.datasource.url с хостами transfer-db / limit-db / screening-db); docker-compose.yml (SPRING_PROFILES_ACTIVE: docker)",
+      "explanation": "Эталон упоминает только запуск с профилем docker; что именно профиль переопределяет, в эталоне не описано."
+    }
+  ],
+  "contamination": [],
+  "notes": "Утверждений, противоречащих коду, и маркеров контаминации не найдено. Сомнительные места, не записанные в errors: (1) «`transfers.DLT` … сообщения, не обработанные после 3 повторов» — верно для ошибок обработки (FixedBackOff(1000, 3) в KafkaErrorHandlingConfig); о том, что недесериализуемые сообщения уходят в DLT сразу, ответ молчит, но повторов для битых сообщений не утверждает; (2) «ошибки возвращаются в формате Problem Details (`ApiExceptionHandler`)» — обобщение: 404 в TransferController.getById возвращается без тела, 409 формирует сам контроллер; слова «все» в ответе нет; (3) «резервирует сумму» сказано в контексте лимитов, рядом есть «компенсацией резерва лимита» и «Фактического списания и зачисления средств в коде не найдено», поэтому к «резервированию средств» не приравнено. K1-S4 засчитан по ядру: record и отсутствие родителя названы явно, «без зависимостей» — только как «других зависимостей между модулями нет». K1-S6 засчитан по ядру: порты, KRaft, Dockerfile с аргументом MODULE, state-dir без volume; healthcheck и именованные тома брокера и БД не упомянуты. Объём: в разделе 1 четыре предложения при требовании 2–3, в разделе 2 три при требовании 1–2 — это длина, в errors не записано. Расхождений эталона с кодом по разделам 0, 1, 5, 8, 11 и 12 не выявлено."
+}

@@ -1,0 +1,87 @@
+{
+  "case": "01",
+  "answer_id": "J",
+  "mandatory": [
+    {
+      "id": "K1-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Система принимает заявки на денежные переводы и по каждой выносит итоговое решение"},
+        {"atom": "b", "status": "есть", "quote": "Решение строится на двух независимых проверках: дневного и месячного лимитов отправителя"},
+        {"atom": "c", "status": "есть", "quote": "и наличия отправителя в списке заблокированных"},
+        {"atom": "d", "status": "есть", "quote": "по каждой выносит итоговое решение: перевод исполнен, отменён или отклонён … Решение строится на двух независимых проверках"}
+      ]
+    },
+    {
+      "id": "K1-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "между собой они общаются только через топики Kafka (хореография, без оркестратора) … **Синхронные вызовы между сервисами** в коде не найдены (HTTP-клиентов, gRPC и подобного нет)"},
+        {"atom": "b", "status": "есть", "quote": "публикует событие NEW в `transfers` → `limit-service` и `screening-service` независимо публикуют вердикты в `limit-results` и `screening-results`"},
+        {"atom": "c", "status": "есть", "quote": "`transfer-service` сводит их (Kafka Streams join с окном 10 с, `DecisionTopologyConfig.decisionStream`) и публикует итоговый статус снова в `transfers`"}
+      ]
+    },
+    {
+      "id": "K1-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "| `transfer-common` | библиотека | нет | … | `transfer-service` | сервис | есть … | `limit-service` | сервис | нет | … | `screening-service` | сервис | нет |"},
+        {"atom": "b", "status": "есть", "quote": "| `transfer-common` | библиотека | нет | Общий формат сообщения о переводе (`com.example.common.Transfer`), которым сервисы обмениваются через Kafka. |"},
+        {"atom": "c", "status": "есть", "quote": "| `transfer-service` | сервис | есть: REST `/transfers` (`TransferController`), порт 8080 | … | `limit-service` | сервис | нет | … | `screening-service` | сервис | нет |"}
+      ]
+    },
+    {
+      "id": "K1-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Java 21"},
+        {"atom": "b", "status": "есть", "quote": "Spring Boot 3.4.1"},
+        {"atom": "c", "status": "есть", "quote": "Spring for Apache Kafka, Kafka Streams (только `transfer-service`) … Apache Kafka (образ `confluentinc/cp-kafka:7.6.0`, режим KRaft)"},
+        {"atom": "d", "status": "есть", "quote": "Liquibase, Jackson, JDBC-драйвер PostgreSQL, PostgreSQL 16 (`postgres:16-alpine`)"}
+      ]
+    },
+    {
+      "id": "K1-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "`transfers` | `transfer-service`: событие NEW … `limit-service` — `TransferEventsListener.onEvent` (`limit`); `screening-service` … (`screening`); `transfer-service` … (`transfer-tracker`)"},
+        {"atom": "b", "status": "есть", "quote": "`limit-results` | `limit-service` — `LimitService.sendAndWait` | `transfer-service` … (Kafka Streams … (`transfer-tracker`) … `screening-results` | `screening-service` … те же два потребителя"}
+      ]
+    },
+    {
+      "id": "K1-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "`confluentinc/cp-kafka:7.6.0`, один брокер"},
+        {"atom": "b", "status": "есть", "quote": "у каждого сервиса своя БД … `postgres:16-alpine`, три отдельных экземпляра: `transfer-db` (БД `transferdb`, порт хоста 5434), `limit-db` (`limitdb`, 5432), `screening-db` (`screeningdb`, 5433)"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K1-S1", "status": "есть", "quote": "`transfers.DLT`, `limit-results.DLT`, `screening-results.DLT` … в `transfers.DLT` — все три сервиса, в остальные два — только `transfer-service`"},
+    {"id": "K1-S2", "status": "есть", "quote": "(Kafka Streams, группа явно не задана … По умолчанию Spring Boot подставляет `spring.application.name`, то есть `transfer-service`"},
+    {"id": "K1-S3", "status": "есть", "quote": "Три рабочих топика имеют по 3 партиции и политику compact; они объявлены в `TopicsConfig` каждого сервиса … Автосоздание топиков отключено, топики создают сами сервисы"},
+    {"id": "K1-S4", "status": "нет", "quote": ""},
+    {"id": "K1-S5", "status": "нет", "quote": ""},
+    {"id": "K1-S6", "status": "есть", "quote": "один брокер в режиме KRaft (без ZooKeeper). Порт 9092 открыт с хоста, 29092 используется внутри сети compose … порт хоста 5434 … том под него в compose не подключён"}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {
+      "quote": "Maven 3.9.9, Eclipse Temurin 21 (JDK для сборки, JRE для запуска)",
+      "code_ref": "Dockerfile (FROM maven:3.9.9-eclipse-temurin-21 AS build; FROM eclipse-temurin:21-jre)",
+      "explanation": "Версия Maven и образы JDK для сборки и JRE для запуска заданы в Dockerfile; в эталоне есть только запуск на JRE 21, версии Maven нет"
+    },
+    {
+      "quote": "`limit-service` — `LimitService.sendAndWait` … `screening-service` — `ScreeningService.sendAndWait`",
+      "code_ref": "limit-service LimitService.sendAndWait; screening-service ScreeningService.sendAndWait",
+      "explanation": "Приватные методы sendAndWait существуют, именно они отправляют ответы в limit-results и screening-results; в перечне «Не маркеры» раздела 8 их нет"
+    },
+    {
+      "quote": "Кэши, реестр схем, service discovery, API-шлюз и мониторинг в коде не найдены.",
+      "code_ref": "docker-compose.yml; pom.xml трёх сервисов",
+      "explanation": "В compose только брокер, три БД и три сервиса; зависимостей кэша, Schema Registry, discovery, шлюза и actuator в pom нет"
+    },
+    {
+      "quote": "Порт 8080 взят из `docker-compose.yml`; `server.port` в `application.yml` не задан.",
+      "code_ref": "docker-compose.yml (transfer-service, ports 8080:8080); transfer-service/src/main/resources/application.yml",
+      "explanation": "server.port в конфигурации отсутствует: 8080 — умолчание Spring Boot и порт, опубликованный в compose"
+    }
+  ],
+  "contamination": [],
+  "notes": "Ошибок, противоречащих коду, и нарушений явных правил промпта не найдено; маркеров контаминации нет. K1-M2(b): слова «параллельно» в ответе нет, атом закрыт однозначной конструкцией «событие NEW → оба сервиса независимо публикуют вердикты → join» и раздельными группами `limit` и `screening` на одном топике. K1-S4 — нет: из трёх фактов назван только один («у `transfer-common` родителя нет»); что это record и что у модуля нет зависимостей, в ответе не сказано. K1-S5 — нет, пограничный случай: есть «клиент узнаёт итог запросом `GET /transfers/{id}`» (вторая половина пункта), но об ответе на POST (201, статус NEW) утверждения нет; если считать ядром пункта только «итог — через GET», пункт был бы закрыт этой цитатой. K1-S6 — есть по ядру: порты брокера, БД и HTTP, KRaft, отсутствие тома у state-dir; healthcheck, Dockerfile с ARG MODULE и именованные тома не упомянуты. «Сообщения передаются в JSON: ключ — id перевода (Long)» — упрощение: в JSON сериализуется только значение, ключ пишет LongSerializer (application.yml сервисов); тип ключа назван верно, в errors не записано. Расхождений эталона с кодом по разделам 1, 5 и 8 не найдено."
+}

@@ -1,0 +1,111 @@
+{
+  "case": "05",
+  "answer_id": "I",
+  "mandatory": [
+    {
+      "id": "K5-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "При поступлении события `NEW` с положительной суммой (`amount > 0`) … `limit-service` отклоняет операцию с `SINGLE_TRANSFER_LIMIT_EXCEEDED`"},
+        {"atom": "b", "status": "есть", "quote": "с решением `DECLINED`, причиной `SINGLE_TRANSFER_LIMIT_EXCEEDED` … колонка `reservations.reason VARCHAR(50)` вмещает новый код отказа длиной 30 символов"},
+        {"atom": "c", "status": "есть", "quote": "При условии `amount > single_transfer_max` система должна отклонить перевод … При условии `amount <= single_transfer_max` система должна продолжить проверку перевода"},
+        {"atom": "d", "status": "есть", "quote": "строгий порядок проверок и фиксировать первую причину отказа: `INVALID_AMOUNT` → `SINGLE_TRANSFER_LIMIT_EXCEEDED` → `DAILY_LIMIT_EXCEEDED` → `MONTHLY_LIMIT_EXCEEDED`"}
+      ]
+    },
+    {
+      "id": "K5-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Если `screening-service` вернул `APPROVED` → `status = \"CANCELLED\"`, `decidedBy = \"limit\"` … Если `screening-service` вернул `DECLINED` → `status = \"DENIED\"`, `decidedBy = null`"},
+        {"atom": "b", "status": "есть", "quote": "не увеличивать `daily_used` и `monthly_used` отправителя"},
+        {"atom": "c", "status": "есть", "quote": "с решением `DECLINED`, причиной `SINGLE_TRANSFER_LIMIT_EXCEEDED` и состоянием резерва `NONE`, сохранить запись в `reservations`"}
+      ]
+    },
+    {
+      "id": "K5-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Таблица БД `limit_settings` в `limit-db` (новый) — хранение актуальных глобальных значений разового, дневного и месячного лимитов … без перезапуска сервисов"},
+        {"atom": "b", "status": "есть", "quote": "`daily_max = 50000.00`, `monthly_max = 200000.00` … Начальное значение `single_transfer_max` в коде отсутствует и **требует уточнения у бизнеса**"},
+        {"atom": "c", "status": "есть", "quote": "Удалить статические параметры `limits.daily-max` и `limits.monthly-max` из `limit-service/src/main/resources/application.yml`"}
+      ]
+    },
+    {
+      "id": "K5-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Разместить REST API непосредственно в `limit-service`, хранить лимиты в `limit-db` … сохранение чётких границ домена"},
+        {"atom": "b", "status": "есть", "quote": "В текущей системе веб-сервер и внешний HTTP-порт (`8080`) есть только у `transfer-service` … требуется добавить веб-стек и валидацию в `limit-service`"},
+        {"atom": "c", "status": "есть", "quote": "Эндпоинт: `GET /limits` … Эндпоинт: `PUT /limits` … | Параметр | Источник (body/path/query) | Тип | Обязательный | Описание |"},
+        {"atom": "d", "status": "есть", "quote": "`400` | Невалидный JSON, отсутствуют обязательные поля, значения `<= 0`, превышена разрядность … `409` | Конфликт конкурентного обновления записи лимитов"}
+      ]
+    },
+    {
+      "id": "K5-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "5.2. transfer-service … Изменений нет … 5.3. screening-service … Изменений нет … 5.4. transfer-common … Изменений нет"},
+        {"atom": "b", "status": "есть", "quote": "При получении дублирующего сообщения `NEW` по уже существующему в `reservations` переводу система должна возвращать ранее сохранённое решение без пересчёта по обновлённым лимитам"}
+      ]
+    },
+    {
+      "id": "K5-M6",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "создаётся перевод ровно на `15000.00` → перевод одобряется (`COMPLETED`) … создаётся перевод на `15000.01` → `limit-service` отклоняет операцию с `SINGLE_TRANSFER_LIMIT_EXCEEDED`"},
+        {"atom": "b", "status": "есть", "quote": "создаётся перевод на `20000.00` (превышены и разовый, и остаток дневного лимита) → причина отказа `SINGLE_TRANSFER_LIMIT_EXCEEDED`"},
+        {"atom": "c", "status": "есть", "quote": "после уменьшения `singleTransferMax` до `10000.00` через `PUT /limits` создаётся перевод на `12000.00` → перевод отклоняется с `SINGLE_TRANSFER_LIMIT_EXCEEDED` без перезапуска сервисов"},
+        {"atom": "d", "status": "есть", "quote": "`singleTransferMax > dailyMax` (например, `60000.00 > 50000.00`) → `400 Bad Request` (`application/problem+json`), значения в БД не изменены"}
+      ]
+    },
+    {
+      "id": "K5-M7",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "какое начальное значение `singleTransferMax` должно быть установлено в миграции БД при первом развёртывании доработки"},
+        {"atom": "b", "status": "есть", "quote": "в какой валюте задаются все три лимита (предположительно `RUB`), требуется ли передавать/возвращать код валюты в `/limits`"},
+        {"atom": "c", "status": "есть", "quote": "Кто будет вызывать `GET /limits` и `PUT /limits` (закрытый контур или требуется защита эндпоинтов)"},
+        {"atom": "d", "status": "есть", "quote": "нужно ли вести журнал аудита изменений лимитов (время, инициатор, старые и новые значения)?"},
+        {"atom": "e", "status": "нет", "quote": ""}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K5-S1", "status": "есть", "quote": "Вариант Б: Разместить публичные эндпоинты в `transfer-service` с синхронным HTTP-проксированием … Вариант В: Разместить REST API и таблицу лимитов в `transfer-service`"},
+    {"id": "K5-S2", "status": "есть", "quote": "Однострочная типизированная таблица `limit_settings` … позволяет обойтись без распределённой инвалидации кэша при масштабировании `limit-service` … Вариант 2: Таблица формата"},
+    {"id": "K5-S3", "status": "нет", "quote": ""},
+    {"id": "K5-S4", "status": "есть", "quote": "техническое значение по умолчанию до ответа бизнеса — `50000.00`, совпадающее с текущим `daily_max`, чтобы выкатка не меняла действующее поведение"},
+    {"id": "K5-S5", "status": "нет", "quote": ""},
+    {"id": "K5-S6", "status": "есть", "quote": "не должны брать длительных эксклюзивных блокировок на таблицу `limit_settings`, которые могли бы задержать транзакции чтения в `limit-service` дольше окна агрегации в Kafka Streams"},
+    {"id": "K5-S7", "status": "нет", "quote": ""},
+    {"id": "K5-S8", "status": "есть", "quote": "`CHECK (single_transfer_max <= daily_max AND daily_max <= monthly_max)` — непротиворечивость порогов между собой"},
+    {"id": "K5-S9", "status": "есть", "quote": "новый порог `singleTransferMax` будет сравниваться с числовым `amount` без учёта валюты"},
+    {"id": "K5-S10", "status": "есть", "quote": "Заблокированный отправитель … → финальный статус перевода `DENIED` … повторная доставка события `NEW` … → возвращается прежнее решение `APPROVED`"}
+  ],
+  "errors": [
+    {
+      "quote": "`CHECK (single_transfer_max > 0 AND daily_max > 0 AND monthly_max > 0)` … должны ли все лимиты быть строго больше нуля (`>= 0.01`), или бизнесу нужна возможность выставить `0.00`",
+      "category": "неточность",
+      "etalon_ref": "раздел 10, таблица «Штраф»: решение в схеме принято раньше открытого вопроса к бизнесу (−0,5)",
+      "code_ref": "limit-service application.yml (limits.daily-max, limits.monthly-max — без проверки знака); LimitLedger.decide; 001-create-tables.sql (CHECK-ограничений нет)",
+      "explanation": "Схема (CHECK > 0), валидация PUT (значения <= 0 → 400) и тест (0 → 400) запрещают нулевой лимит, хотя вопрос 3 о допустимости 0.00 оставлен бизнесу. В коде запрета нет: при нулевом лимите сравнение в LimitLedger.decide отклоняет любую положительную сумму, то есть вариант с 0.00 работоспособен. Это противоречие внутри постановки, а не с кодом; категория выбрана по размеру штрафа из чек-листа."
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "выполняется сохранение `sender_usage`, что создаёт нулевые записи для новых отправителей и увеличивает `version` при срабатывании `lazyReset`",
+      "code_ref": "limit-service LimitLedger.decide (usageRepository.save(usage) после decline; ранний return для INVALID_AMOUNT); SenderUsage.lazyReset; @Version в SenderUsage",
+      "explanation": "Сохранение sender_usage при отказе по DAILY/MONTHLY есть в эталоне (L6). Сверх эталона: если lazyReset обнулил счётчики, выполняется UPDATE с ростом version, и параллельный перевод того же отправителя получает конфликт оптимистической блокировки. Отсюда верный вывод для доработки: новую проверку выполнять до обращения к sender_usage, как ветку INVALID_AMOUNT."
+    },
+    {
+      "quote": "для нового отправителя возможна ошибка уникальности PK, ретраи `DefaultErrorHandler`",
+      "code_ref": "limit-service LimitLedger.decide (findById(...).orElseGet(new SenderUsage) и save → INSERT); 001-create-tables.sql (sender_usage.sender_id PRIMARY KEY); KafkaErrorHandlingConfig.kafkaErrorHandler (FixedBackOff(1000, 3))",
+      "explanation": "Два первых перевода нового отправителя, обрабатываемые параллельно разными экземплярами (ключ — transferId, партиции разные), оба вставляют строку sender_usage; второй получает нарушение PK и уходит в повтор. Уточняет B12: в эталоне названы только @Version и повторы."
+    },
+    {
+      "quote": "выделить отдельный HTTP-порт (например, `8081`, чтобы не конфликтовать с `8080` у `transfer-service` при локальном запуске)",
+      "code_ref": "transfer-service application.yml (server.port не задан, действует 8080 по умолчанию); docker-compose.yml (ports 8080:8080 только у transfer-service); limit-service application.yml (локальный профиль с localhost)",
+      "explanation": "После добавления веб-слоя limit-service по умолчанию тоже займёт 8080 и при локальном запуске без Docker столкнётся с transfer-service; порт нужно задать и опубликовать явно."
+    },
+    {
+      "quote": "Включить поддержку RFC 7807 (`application/problem+json`) и отключить `spring.jpa.open-in-view` единообразно с `transfer-service/src/main/resources/application.yml`",
+      "code_ref": "transfer-service application.yml (spring.mvc.problemdetails.enabled: true, spring.jpa.open-in-view: false); limit-service application.yml (этих настроек нет)",
+      "explanation": "Формат ошибок problem+json и отключённый open-in-view настроены только в transfer-service; для нового API в limit-service их нужно задать отдельно, иначе ошибки 400/409/500 не будут в формате, заявленном в контракте."
+    }
+  ],
+  "contamination": [],
+  "notes": "Все семь групп M закрыты. K5-M7: атомы a–e — начальное значение, валюта, права доступа, аудит, снижение ниже израсходованного; (e) — «нет»: тема раскрыта готовым правилом («При уменьшении лимитов через `PUT /limits` ниже уже накопленных…») и тестом, но в вопросы к бизнесу не вынесена; группа закрыта 4 из 5. K5-S2 засчитан по ядру: сравнены модели хранения в limit-db (одна строка / ключ-значение) и место хранения (limit-db / transfer-db с топиком), есть аргумент про масштабирование limit-service; буквального сравнения yml / БД / память нет. K5-S4 засчитан по однозначной конструкции: 50000.00, равное текущему daily_max, не меняет поведение. K5-S6 пограничный, засчитан по ядру: окно JOIN связано с задержкой чтения limit_settings, есть 500 при отсутствии записи настроек, значение по умолчанию для выкатки и сохранность значений после перезапуска limit-service; связки «перезапуск limit-service — окно JOIN» в явном виде нет. K5-S7 не засчитан: составная причина при DENIED приведена, но расхождение между «отклонять» и CANCELLED не отмечено (матрица исходов закрыла K5-M2a). K5-S5: отсутствие аутентификации упомянуто только в вопросе 4. K5-S3: синхронная проверка в POST не рассматривалась (вариант Б — о проксировании API лимитов). Сомнительное место, в errors не внесено: «`limit-service` игнорирует `currency`, сравнивая `amount` напрямую с лимитами» — упрощение в контексте валюты; само правило пересказано верно («сравнивать накопленный расход», тест 45000 + 10000 → DAILY_LIMIT_EXCEEDED). Предписания уровня конфигурации (порт 8081, `spring.jpa.open-in-view`, удаление `limits.*` из application.yml) не являются предписанием классов и методов, в errors не внесены. Для штрафа «решение в схеме раньше открытого вопроса» отдельной категории нет, выбрана «неточность» (−0,5). Расхождений эталона с кодом не найдено, маркеров контаминации нет."
+}

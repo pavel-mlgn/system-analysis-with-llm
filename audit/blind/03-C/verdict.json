@@ -1,0 +1,104 @@
+{
+  "case": "03",
+  "answer_id": "C",
+  "mandatory": [
+    {
+      "id": "K3-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Эндпоинт: POST /transfers … Эндпоинт: GET /transfers … Эндпоинт: GET /transfers/{id}"},
+        {"atom": "b", "status": "есть", "quote": "| 201 | Успешное создание нового перевода. … | 200 | Возврат существующего перевода … | 400 | Ошибка валидации тела запроса … | 409 | Конфликт … | 503 | Ошибка при публикации сообщения в Kafka"},
+        {"atom": "c", "status": "есть", "quote": "| 200 | Перевод успешно найден. | … | 404 | Перевод с указанным id не найден. |"},
+        {"atom": "d", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K3-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "sender_usage (база: limitdb) … reservations (база: limitdb) … blocked_senders (база: screeningdb) … screening_checks (база: screeningdb) … transfers (база: transferdb) … transfer_history"},
+        {"atom": "b", "status": "есть", "quote": "| daily_used | DECIMAL(15,2) | … | monthly_used | DECIMAL(15,2) | … | amount | DECIMAL(15,2) |"},
+        {"atom": "c", "status": "есть", "quote": "Таблица: reservations (база: limitdb) … | transfer_id | BIGINT | Да | … Таблица: screening_checks (база: screeningdb) … | transfer_id | BIGINT | Да |"},
+        {"atom": "d", "status": "есть", "quote": "| transfer_id | BIGINT | Нет | transfers(id) | Составной | Да | Нет | idx_transfer_history_transfer_id | ID перевода |"},
+        {"atom": "e", "status": "есть", "quote": "| uq_transfer_history_stage | transfer_id, stage |"},
+        {"atom": "f", "status": "есть", "quote": "Таблица: blocked_senders (база: screeningdb) … | sender_id | BIGINT | Нет | Нет | Да | Да | Нет | idx_blocked_senders_sender_id | ID отправителя |"}
+      ]
+    },
+    {
+      "id": "K3-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "id | Long … senderId | Long … recipientId | Long … amount | BigDecimal … currency | String … status | String … decidedBy | String … messageInfo | String … createdAt | String(ISO) / LocalDateTime"},
+        {"atom": "b", "status": "нет", "quote": ""}
+      ]
+    },
+    {
+      "id": "K3-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Канал: transfers … | Партиции | 3 | … | Политика хранения | compact | … Канал: limit-results … Канал: screening-results … | Партиции | 3 | … | Политика хранения | compact |"},
+        {"atom": "b", "status": "есть", "quote": "| Ключ сообщения | Long (ID перевода) | … | Сериализация значения | JsonSerializer / JsonDeserializer |"},
+        {"atom": "c", "status": "есть", "quote": "| Отправители | transfer-service (REST Controller) … | Получатели | limit-service (group: limit), screening-service (group: screening), transfer-service (group: transfer-tracker) |"}
+      ]
+    },
+    {
+      "id": "K3-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Отсутствует код ответа 500 (Internal Server Error) | Присутствует глобальный обработчик `ApiExceptionHandler`, возвращающий код `500` и структуру `ProblemDetail`."}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K3-S1", "status": "есть", "quote": "| version | BIGINT | Нет | Нет | Нет | Да | 0 | Нет | Поле для оптимистичной блокировки |"},
+    {"id": "K3-S2", "status": "нет", "quote": ""},
+    {"id": "K3-S3", "status": "нет", "quote": ""},
+    {"id": "K3-S4", "status": "нет", "quote": ""},
+    {"id": "K3-S5", "status": "есть", "quote": "| state | RESERVED, COMMITTED, RELEASED, NONE |"},
+    {"id": "K3-S6", "status": "нет", "quote": ""},
+    {"id": "K3-S7", "status": "нет", "quote": ""},
+    {"id": "K3-S8", "status": "нет", "quote": ""},
+    {"id": "K3-S9", "status": "нет", "quote": ""}
+  ],
+  "errors": [
+    {
+      "quote": "| id | body | Long | Да | ID перевода | … | amount | body | BigDecimal | Да | Сумма (больше нуля, макс. 13 цифр, 2 знака после запятой) |",
+      "category": "нарушение_формата",
+      "etalon_ref": "раздел 0.3; чек-лист кейса 3 (специфичные штрафы); K3-M1 (d)",
+      "code_ref": "transfer-service TransferRequest (record, поля Long/BigDecimal), TransferEntity; openapi/transfer-api.yaml (type: integer, format: int64; type: number); правило prompt.md «JSON-типы для HTTP API»",
+      "explanation": "В таблицах HTTP API (параметры запроса и ответа всех трёх эндпоинтов) указаны Java-типы Long и BigDecimal вместо JSON-типов integer/number, хотя промпт прямо требует JSON-типы для HTTP API."
+    },
+    {
+      "quote": "| createdAt | String(ISO) / LocalDateTime | Нет | Дата-время создания | \"2024-01-01T12:00:00\" |",
+      "category": "неточность",
+      "etalon_ref": "4.4; раздел 8 «Частые искажения»; K3-S9",
+      "code_ref": "application.yml всех трёх сервисов (spring.kafka.producer.value-serializer: JsonSerializer задан по имени класса); transfer-common Transfer.createdAt (LocalDateTime); transfer-service DecisionTopologyConfig.decisionStream (JsonSerde)",
+      "explanation": "JsonSerializer/JsonSerde заданы по имени класса и используют собственный ObjectMapper spring-kafka, поэтому LocalDateTime уходит в Kafka массивом [год, месяц, день, час, мин, сек, нано], а не ISO-строкой. ISO-строки — только в REST-ответах transfer-service."
+    },
+    {
+      "quote": "Канал: transfers.DLT, limit-results.DLT, screening-results.DLT … | Отправители | Все сервисы (через DeadLetterPublishingRecoverer) |",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "5.1; раздел 8 «Частые искажения»; чек-лист кейса 3 (специфичные штрафы)",
+      "code_ref": "limit-service и screening-service: KafkaErrorHandlingConfig (объявлен только transfersDlt), TransferEventsListener.onEvent (topics = transfers); transfer-service: KafkaErrorHandlingConfig.limitResultsDlt/screeningResultsDlt, TransferEventListener.onEvent (transfers, limit-results, screening-results)",
+      "explanation": "limit-results.DLT и screening-results.DLT объявляет и пишет только transfer-service (трекер читает топики ответов). limit-service и screening-service читают только transfers, поэтому их обработчик ошибок пишет только в transfers.DLT."
+    },
+    {
+      "quote": "Для поля `amount` не указан параметр формата `minimum: 0`, ограничивающий точное поведение, используется `exclusiveMinimum: true` … что в OpenAPI не отражено в `multipleOf` и `maximum`",
+      "category": "ложная_аномалия",
+      "etalon_ref": "6.1 «Выдуманные расхождения»; чек-лист кейса 3 (специфичные штрафы)",
+      "code_ref": "transfer-service/src/main/resources/openapi/transfer-api.yaml, components.schemas.TransferRequest.amount; transfer-service TransferRequest (@Positive, @Digits(integer = 13, fraction = 2))",
+      "explanation": "В контракте у amount заданы minimum: 0, exclusiveMinimum: true, maximum: 9999999999999.99 и multipleOf: 0.01 — они соответствуют @Positive и @Digits(integer = 13, fraction = 2). Расхождение выдумано."
+    },
+    {
+      "quote": "Тип `string` со строгим `enum` (NEW, COMPLETED, CANCELLED, DENIED) | Поле `TransferEntity.status` имеет тип `String` и не привязано к перечислению в Java",
+      "category": "ложная_аномалия",
+      "etalon_ref": "6.1 «Выдуманные расхождения»; чек-лист кейса 3 (специфичные штрафы)",
+      "code_ref": "transfer-service TransferEntity.status, TransferHistoryEntry.status; TransferTrackingService.createTransfer/recordServiceResult/applyFinalStatus; TransferDecisionService.decide; openapi/transfer-api.yaml (TransferStatus, HistoryEntry.status)",
+      "explanation": "String в Java при enum в контракте — не расхождение: фактические значения статуса перевода (NEW, COMPLETED, CANCELLED, DENIED) и статуса в истории (плюс APPROVED, DECLINED) совпадают с enum контракта. То же повторено для HistoryEntry.status — записано один раз."
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "| Сериализация ключа | ByteArraySerializer / LongSerializer | … | Сериализация значения | ByteArraySerializer / JsonSerializer |",
+      "code_ref": "KafkaErrorHandlingConfig.kafkaErrorHandler и keySerializer (limit-service, screening-service, transfer-service)",
+      "explanation": "Для DLT ключ сериализуется через DelegatingByTypeSerializer (byte[] → ByteArraySerializer, Long → LongSerializer), значение — ByteArraySerializer (rawTemplate, исходные байты) или JsonSerializer (jsonTemplate). Сериализация ключа DLT по типу в эталоне не описана."
+    }
+  ],
+  "contamination": [],
+  "notes": "K3-M1(d): в таблицах HTTP API стоят Java-типы Long/BigDecimal, атом не закрыт, нарушение формата записано один раз. K3-M3(b): в формате сообщения у status только пример «NEW», наборы значений не перечислены; enum-списки есть лишь в разделе 4 как пересказ контракта OpenAPI для HTTP-схем Transfer/HistoryEntry и к сообщению Kafka не отнесены — атом не засчитан. K3-S2 (пограничный): в колонке FK у всех колонок таблиц limitdb и screeningdb стоит «Нет», но это обязательная колонка формата; явного вывода об отсутствии FK и о логических связях по sender_id в ответе нет — не засчитано. K3-S3: DLT-топики перечислены, но отправители указаны неверно («Все сервисы» для всех трёх), кто объявляет топики — не сказано; не засчитано, ошибка записана. K3-S6: «transfer-service (Kafka Streams)» без имени группы / application.id — не засчитано. K3-S7: из реальных расхождений только O1 (500), остальные три строки раздела 4 выдуманы; строки про Transfer.status и HistoryEntry.status — одна и та же ошибка, записана один раз. В errors не записано: updatedAt в ответе помечен Nullable «Да» (колонка допускает NULL, через API поле всегда заполнено — формально верно); три DLT-топика объединены в один блок «Канал» (промпт просит таблицу на канал, прямого запрета нет); не указан код 400 для GET /transfers/{id} (пропуск, не ошибка); формулировка «макс. 13 цифр» для @Digits(integer = 13, fraction = 2) неоднозначна. Расхождений эталона с кодом по разделам 4, 5, 6, 8 не найдено; в code.txt 57 файлов, как в эталоне."
+}

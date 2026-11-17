@@ -1,0 +1,113 @@
+{
+  "case": "04",
+  "answer_id": "M",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "transfer-service - TransferApp, Spring Web + Kafka Streams + JPA … limit-service - LimitApp, Spring Kafka + JPA … screening-service - ScreeningApp, Spring Kafka + JPA"},
+        {"atom": "b", "status": "есть", "quote": "Контейнер transfer-db - postgres 16-alpine, host-порт 5434 … Контейнер limit-db - postgres 16-alpine, host-порт 5432 … Контейнер screening-db - postgres 16-alpine, host-порт 5433"},
+        {"atom": "c", "status": "есть", "quote": "topic transfers - 3 партиции, compact … topic limit-results - 3 партиции, compact … topic screening-results - 3 партиции, compact"},
+        {"atom": "d", "status": "есть", "quote": "HTTP REST - POST /transfers, GET /transfers, GET /transfers/{id}, порт 8080 … Kafka PLAINTEXT broker 29092 - produce transfers, ключ transferId, статус NEW … JDBC PostgreSQL transfer-db 5432"},
+        {"atom": "e", "status": "есть", "quote": "Все междусервисные связи — только через топики Kafka, синхронный вход один: REST `TransferController`."}
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "TTS->>TDB: saveAndFlush(TransferEntity) и historyRepository.save(stage NEW) … TC->>K: template.send('transfers', id, Transfer.newTransfer(...)).get(10 секунд) … TC-->>Client: 201 Created"},
+        {"atom": "b", "status": "есть", "quote": "par limit-service … K->>LEL: transfers, groupId=limit, Transfer(status=NEW) … and screening-service … K->>SEL: transfers, groupId=screening, Transfer(status=NEW)"},
+        {"atom": "c", "status": "есть", "quote": "K->>ST: limit-results и screening-results, ключ transferId … Note over ST: JoinWindows.ofTimeDifferenceWithNoGrace(10 секунд) - обе проверки должны попасть в окно"},
+        {"atom": "d", "status": "есть", "quote": "K->>TEL: transfers, groupId=transfer-tracker, status=COMPLETED … TEL->>TTS: applyFinalStatus(transfer) … K->>LEL: transfers, status=COMPLETED … LEL->>LS: onFinalStatus(transfer)"}
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "SJ->>SDB: save(ScreeningCheck DECLINED, reason=SENDER_BLOCKED) … SS->>K: send('screening-results', DECLINED, decidedBy=screening, messageInfo=SENDER_BLOCKED)"},
+        {"atom": "b", "status": "есть", "quote": "LL->>LDB: usage.reserve(amount), Reservation(APPROVED, state=RESERVED) … Note over LL,LDB: Лимит уже списан - это действие потребуется компенсировать"},
+        {"atom": "c", "status": "есть", "quote": "LL->>LDB: usage.release(amount, reservedOn, today) … LL->>LDB: reservation.markReleased(), state=RELEASED"}
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "Диаграмма 4а. ER — transferdb (transfer-service) … Диаграмма 4б. ER — limitdb (limit-service) … Диаграмма 4в. ER — screeningdb (screening-service)"},
+        {"atom": "b", "status": "есть", "quote": "Единственная связь по внешнему ключу во всём проекте: `transfer_history.transfer_id → transfers.id`"},
+        {"atom": "c", "status": "есть", "quote": "Диаграмма 4г. ER — объекты вне БД (сообщения и DTO) … `Transfer` (`transfer-common`) — сообщение Kafka"},
+        {"atom": "d", "status": "есть", "quote": "sender_usage ||..o{ reservations : \"логически по sender_id, FK нет\" … Логические связи между сущностями разных диаграмм (по идентификатору, без FK)"}
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "[*] --> NEW : POST /transfers, TransferTrackingService.createTransfer, history stage NEW"},
+        {"atom": "b", "status": "есть", "quote": "NEW --> COMPLETED : Streams join, limit APPROVED и screening APPROVED … NEW --> CANCELLED : … limit DECLINED и screening APPROVED … NEW --> DENIED : … limit DECLINED и screening DECLINED"},
+        {"atom": "c", "status": "есть", "quote": "COMPLETED --> [*] … CANCELLED --> [*] … DENIED --> [*] … Терминальные статусы, обратных переходов в коде нет"}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K4-S1", "status": "есть", "quote": "Если проверки не попали в окно JoinWindows 10 секунд, статус остаётся NEW, таймаута и компенсации в коде нет"},
+    {"id": "K4-S2", "status": "нет", "quote": ""},
+    {"id": "K4-S3", "status": "есть", "quote": "participant TEL as \"TransferEventListener\" … K->>TEL: transfers, groupId=transfer-tracker, status=COMPLETED … Note over SEL: Резервов нет, только лог - nothing to do"},
+    {"id": "K4-S4", "status": "нет", "quote": ""},
+    {"id": "K4-S5", "status": "есть", "quote": "DECIMAL amount \"DECIMAL(15,2) NOT NULL\" … BIGINT sender_id \"NOT NULL UNIQUE\" … BIGINT transfer_id FK \"REFERENCES transfers(id), UNIQUE(transfer_id, stage)\""},
+    {"id": "K4-S6", "status": "нет", "quote": ""},
+    {"id": "K4-S7", "status": "есть", "quote": "NEW --> CANCELLED : Streams join, неожиданный статус проверки, messageInfo UNEXPECTED_RESULT"}
+  ],
+  "errors": [
+    {
+      "quote": "`state`: NONE → RESERVED (approve) → COMMITTED (markCommitted при COMPLETED) или RELEASED (markReleased при CANCELLED/DENIED); при decline сразу NONE",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "раздел 8, «Частые искажения» («NONE -> RESERVED»); раздел 2.3 (состояния резерва); 9.5; штраф кейса 4 «неверный переход состояния»",
+      "code_ref": "limit-service Reservation.approve / Reservation.decline; LimitLedger.decide",
+      "explanation": "Перехода NONE → RESERVED в коде нет: новый Reservation создаётся без состояния и до сохранения получает либо RESERVED (approve()), либо NONE (decline()); NONE — конечное состояние, settle() для него ничего не делает."
+    },
+    {
+      "quote": "sender_usage ||..o{ reservations : \"логически по sender_id, FK нет\"",
+      "category": "неточность",
+      "etalon_ref": "раздел 9.4 («Неточность (−0,5), а не ошибка»: 1 вместо 0..1); раздел 4.2; L3",
+      "code_ref": "limit-service LimitLedger.decide (ветка INVALID_AMOUNT)",
+      "explanation": "Со стороны sender_usage показано «ровно один», а по коду 0..1: при amount null или ≤ 0 резерв сохраняется с ранним return, строка sender_usage не загружается и не создаётся — у резерва нового отправителя счётчиков может не быть."
+    },
+    {
+      "quote": "TransferRequest ||..|| Transfer : \"Transfer.newTransfer в TransferController.publishNew\"",
+      "category": "мелкая_ошибка",
+      "etalon_ref": "раздел 9.4 («Ошибка: … связь TransferRequest ||..|| Transfer как 1:1 с хранимой сущностью»)",
+      "code_ref": "transfer-service TransferController.create, TransferController.duplicate, TransferController.publishNew; transfer-common Transfer.newTransfer, Transfer.withDecision",
+      "explanation": "Кардинальность 1:1 неверна: сообщение строится в publishNew из TransferEntity, а не из запроса; запрос может не породить ни одного сообщения (409, повтор по финальному переводу — 200 без публикации), а одному id соответствует несколько сообщений Transfer (NEW, включая повторные, ответы limit и screening через withDecision, финал)."
+    },
+    {
+      "quote": "String detail \"русские тексты в файле в повреждённой кодировке\"",
+      "category": "ложная_аномалия",
+      "etalon_ref": "раздел 6 (тексты 409, 500 и 503 на русском)",
+      "code_ref": "transfer-service ApiExceptionHandler (INTERNAL_ERROR); TransferController (KAFKA_UNAVAILABLE, текст 409 в duplicate); openapi/transfer-api.yaml (summary)",
+      "explanation": "В code.txt русские тексты записаны корректной кириллицей в UTF-8 («Внутренняя ошибка сервера, повторите запрос позже», «Kafka недоступна, перевод сохранён — повторите запрос с тем же id», «Перевод с id=… уже существует с другими параметрами»); повреждённой кодировки в файле нет."
+    }
+  ],
+  "outside_etalon_correct": [
+    {
+      "quote": "`TransferWithHistory` описан только в `openapi/transfer-api.yaml` (в контроллере это `Map`)",
+      "code_ref": "transfer-service TransferController.getById; openapi/transfer-api.yaml, components.schemas.TransferWithHistory",
+      "explanation": "Java-класса TransferWithHistory нет: getById возвращает ResponseEntity<Map<String, Object>> и собирает LinkedHashMap с ключами transfer и history; схема есть только в контракте."
+    },
+    {
+      "quote": "Kafka consume - groupId limit, listener id limit-transfers-listener … Kafka consume - groupId screening, listener id screening-transfers-listener",
+      "code_ref": "limit-service TransferEventsListener.onEvent; screening-service TransferEventsListener.onEvent (@KafkaListener)",
+      "explanation": "Идентификаторы слушателей заданы явно и отличаются от groupId: id = \"limit-transfers-listener\" при groupId = \"limit\", id = \"screening-transfers-listener\" при groupId = \"screening\". В эталоне указаны только группы."
+    },
+    {
+      "quote": "BOOLEAN newEntity \"@Transient, флаг Persistable.isNew, в БД не хранится\"",
+      "code_ref": "transfer-service TransferEntity (поле newEntity, isNew, markNotNew)",
+      "explanation": "В TransferEntity есть @Transient-поле newEntity = true, которое возвращает isNew() и сбрасывает markNotNew() по @PostLoad/@PostPersist; за счёт него сохранение с id от клиента идёт как INSERT."
+    },
+    {
+      "quote": "Kafka PLAINTEXT broker 29092 - produce transfers, ключ transferId, статус NEW",
+      "code_ref": "docker-compose.yml (KAFKA_LISTENER_SECURITY_PROTOCOL_MAP, KAFKA_ADVERTISED_LISTENERS); application-docker.yml сервисов",
+      "explanation": "Все слушатели брокера работают по PLAINTEXT (PLAINTEXT://broker:29092, PLAINTEXT_HOST://localhost:9092), без шифрования и аутентификации; в эталоне названы только порты."
+    }
+  ],
+  "contamination": [],
+  "notes": "K4-S4 не засчитан: DLT на компонентной диаграмме есть, но три DLT-топика слиты в один узел, и рёбра «produce» идут в него от всех трёх сервисов — распределение (transfers.DLT пишут все, limit-results.DLT и screening-results.DLT — только transfer-service) не показано. Явного утверждения, что limit- и screening-service пишут в *-results.DLT, нет, поэтому в errors это не записано (возможное прочтение — «*-results.DLT пишут все сервисы», раздел 8). K4-S2 не засчитан из-за цепочки «NONE → RESERVED», хотя «при decline сразу NONE» указано. Ошибка про кодировку: проверено поиском по code.txt — кириллица цела, искажённых последовательностей нет; если модель получила файл по каналу с испорченной кодировкой, запись стоит пересмотреть. Формулировка эталона 9.4 «связь TransferRequest ||..|| Transfer как 1:1 с хранимой сущностью» неоднозначна: в ответе обе сущности показаны как объекты вне БД; ошибка записана по несоответствию кардинальности коду. Не записано в errors (сомнение): (1) «TransferWithHistory ||..|| Transfer» — схема OpenAPI Transfer смешана с Kafka-сообщением Transfer, но ответ сам оговаривает «фактически TransferEntity»; (2) «transfers ||--o{ transfer_history» — нижняя граница 0 вместо 1 по эталону (1..4), по DDL 0 допустим; (3) «senderUsageRepository.findById» — поле в LimitLedger называется usageRepository (тип SenderUsageRepository); (4) подпись «DLT после 3 повторов» общая, про недесериализуемые сообщения ответ не говорит. В sequence-диаграммах подписи со скобками не взяты в кавычки — синтаксис проверяется отдельно. Маркеров контаминации нет. Расхождений эталона с кодом в разделах 3, 4, 5, 8, 9 не найдено."
+}

@@ -1,0 +1,79 @@
+{
+  "case": "04",
+  "answer_id": "D",
+  "mandatory": [
+    {
+      "id": "K4-M1",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "subgraph TS[\"Контейнер: transfer-service\"] … subgraph LS[\"Контейнер: limit-service\"] … subgraph SS[\"Контейнер: screening-service\"]"},
+        {"atom": "b", "status": "есть", "quote": "TDB[\"Контейнер: transfer-db — PostgreSQL / transferdb\"] … LDB[\"Контейнер: limit-db — PostgreSQL / limitdb\"] … SDB[\"Контейнер: screening-db — PostgreSQL / screeningdb\"]"},
+        {"atom": "c", "status": "есть", "quote": "subgraph KAFKA[\"Контейнер: broker — Kafka\"] … TRANSFERS[\"topic: transfers\"] … LIMIT_RESULTS[\"topic: limit-results\"] … SCREENING_RESULTS[\"topic: screening-results\"]"},
+        {"atom": "d", "status": "есть", "quote": "CLIENT -->|\"HTTP REST / POST /transfers; GET /transfers; GET /transfers/{id}\"| TC … DTC -->|\"Kafka Streams / topic transfers / join window 10 seconds\"| TRANSFERS"},
+        {"atom": "e", "status": "есть", "quote": "TC -->|\"Kafka PLAINTEXT / broker:29092 / topic transfers … TRANSFERS -->|\"Kafka consumer / group limit / limit-transfers-listener / TransferEventsListener.onEvent\"| LEL"}
+      ]
+    },
+    {
+      "id": "K4-M2",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "HTTP 201 возвращается после публикации NEW … TTS->>TDB: \"saveAndFlush TransferEntity со status NEW\" … TC->>K: \"TransferController.publishNew → topic transfers → Transfer status NEW\""},
+        {"atom": "b", "status": "есть", "quote": "Note over K,SL: \"limit-service и screening-service получают NEW независимо; порядок обработки между ними не задан\""},
+        {"atom": "c", "status": "есть", "quote": "объединение результатов в COMPLETED … K-->>DT: \"Kafka Streams input topic limit-results\" … K-->>DT: \"Kafka Streams input topic screening-results\""},
+        {"atom": "d", "status": "есть", "quote": "K-->>TEL: \"topic transfers / status COMPLETED\" … K-->>LL: \"topic transfers / status COMPLETED\" … LL->>LS: \"LimitService.onFinalStatus\""}
+      ]
+    },
+    {
+      "id": "K4-M3",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "LS->>K: \"topic limit-results → Transfer status APPROVED … SS->>K: \"topic screening-results → Transfer status DECLINED, decidedBy screening, messageInfo SENDER_BLOCKED\""},
+        {"atom": "b", "status": "есть", "quote": "LLED->>LDB: \"SenderUsage.reserve → dailyUsed и monthlyUsed увеличены\" … LLED->>LDB: \"Reservation.approve → state RESERVED\""},
+        {"atom": "c", "status": "есть", "quote": "LLED->>LDB: \"SenderUsage.release → компенсировать ранее зарезервированную сумму\" … LLED->>LDB: \"Reservation.markReleased → state RELEASED\""}
+      ]
+    },
+    {
+      "id": "K4-M4",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "База transferdb содержит transfers и transfer_history. … В limitdb находятся sender_usage и reservations. … В screeningdb находятся blocked_senders и screening_checks."},
+        {"atom": "b", "status": "есть", "quote": "Единственный найденный в проекте физический внешний ключ — transfer_history.transfer_id → transfers.id."},
+        {"atom": "c", "status": "есть", "quote": "%% ДИАГРАММА 4г — ER: объекты, не хранящиеся как отдельные таблицы … Kafka-сообщение com.example.common.Transfer"},
+        {"atom": "d", "status": "есть", "quote": "Между ними используется sender_id, но FOREIGN KEY в Liquibase-коде не найден, поэтому связь показана пунктиром."}
+      ]
+    },
+    {
+      "id": "K4-M5",
+      "atoms": [
+        {"atom": "a", "status": "есть", "quote": "[*] --> NEW : \"TransferTrackingService.createTransfer → status NEW\""},
+        {"atom": "b", "status": "есть", "quote": "NEW --> COMPLETED : \"limit=APPROVED и screening=APPROVED … NEW --> DENIED : \"limit=DECLINED и screening=DECLINED … NEW --> CANCELLED : \"limit=APPROVED и screening=DECLINED"},
+        {"atom": "c", "status": "есть", "quote": "COMPLETED --> [*] : \"финальное состояние\" … CANCELLED --> [*] : \"финальное состояние\" … DENIED --> [*] : \"финальное состояние\""}
+      ]
+    }
+  ],
+  "strong": [
+    {"id": "K4-S1", "status": "нет", "quote": ""},
+    {"id": "K4-S2", "status": "есть", "quote": "approve → RESERVED; … decline → NONE; … RESERVED + COMPLETED → COMMITTED; … RESERVED + CANCELLED или DENIED → RELEASED."},
+    {"id": "K4-S3", "status": "есть", "quote": "participant TEL as TransferEventListener … Note over SL: \"screening.TransferEventsListener только логирует финальный статус; резервов у screening нет\""},
+    {"id": "K4-S4", "status": "есть", "quote": "LKEH -.->|\"Kafka / transfers.DLT / исходная partition\"| TRANSFERS_DLT … TKEH -.->|\"Kafka / transfers.DLT\"| TRANSFERS_DLT … TKEH -.->|\"Kafka / limit-results.DLT\"| LIMIT_RESULTS_DLT"},
+    {"id": "K4-S5", "status": "нет", "quote": ""},
+    {"id": "K4-S6", "status": "есть", "quote": "SENDER_USAGE |o..o{ RESERVATIONS : \"логическая связь по sender_id; FK в коде не найден\""},
+    {"id": "K4-S7", "status": "есть", "quote": "NEW --> CANCELLED : \"любая иная комбинация результатов → messageInfo UNEXPECTED_RESULT\""}
+  ],
+  "errors": [],
+  "outside_etalon_correct": [
+    {
+      "quote": "TransferWithHistory и Problem заданы схемой OpenAPI; отдельные JPA-таблицы для них в коде не найдены.",
+      "code_ref": "transfer-service/src/main/resources/openapi/transfer-api.yaml (components.schemas.TransferWithHistory, Problem); TransferController.getById; ApiExceptionHandler.handleUnexpected",
+      "explanation": "Схемы TransferWithHistory и Problem есть только в контракте: getById собирает ответ как Map с ключами transfer и history, ошибки отдаются через ProblemDetail. На диаграмме 4г они и TransferRequest (5 полей) показаны как нехранимые объекты с верными полями."
+    },
+    {
+      "quote": "TTS -->|\"JPA + JDBC PostgreSQL / transfer-db:5432/transferdb\"| TDB_DATA … LLED -->|\"JPA + JDBC PostgreSQL / limit-db:5432/limitdb\"| LDB_DATA",
+      "code_ref": "application-docker.yml в transfer-service, limit-service, screening-service (spring.datasource.url); docker-compose.yml",
+      "explanation": "В профиле docker сервисы подключаются к БД по внутренним адресам transfer-db:5432/transferdb, limit-db:5432/limitdb, screening-db:5432/screeningdb; в эталоне указаны только внешние порты 5434/5432/5433."
+    },
+    {
+      "quote": "TRANSFERS -->|\"Kafka consumer / group screening / screening-transfers-listener / TransferEventsListener.onEvent\"| SEL",
+      "code_ref": "limit-service и screening-service: listener/TransferEventsListener.onEvent (@KafkaListener id)",
+      "explanation": "Идентификаторы слушателей limit-transfers-listener и screening-transfers-listener заданы в @KafkaListener(id = ...); в эталоне названы только группы limit и screening."
+    }
+  ],
+  "contamination": [],
+  "notes": "Утверждений, противоречащих коду, не найдено: классы, методы, топики, группы, таблицы и переходы сверены с code.txt. Рендеринг диаграмм не оценивался. Спорные решения. K4-M2(b): блока par нет, засчитано по явной пометке Note («получают NEW независимо; порядок обработки между ними не задан»). K4-M2(c): слова JOIN на диаграмме 2 нет, засчитано по смыслу (два входа Kafka Streams → TransferDecisionService.decide, «объединение результатов»; «join window 10 seconds» есть на диаграмме 1). K4-S2: состояния резерва даны перечнем переходов в note диаграммы 5; конечность NONE видна по конструкции (decline → NONE, дальнейшие переходы только из RESERVED), слова «конечное» нет. K4-S6: 0..1 на стороне sender_usage нарисовано (|o), причина (INVALID_AMOUNT) не названа; та же нотация |o..o{ использована и для screeningdb. K4-S5 не засчитан: типы без точности (DECIMAL, VARCHAR), нет NOT NULL и UNIQUE(transfer_id, stage), есть только UK у blocked_senders.sender_id. K4-S1 не засчитан: окно 10 с есть только в подписи связи на диаграмме 1, ветки «нет пары — перевод остаётся NEW» нет. Не внесено в errors (сомнения): кардинальности TRANSFERS ||--o{ TRANSFER_HISTORY (по схеме 0..N, в эталоне 1..4 по логике приложения) и o{ на стороне RESERVATIONS (в эталоне |{); связь TRANSFER_REQUEST ||..o| TRANSFER_MESSAGE подписана как создание через Transfer.newTransfer — один запрос даёт не более одного NEW (TransferController.publishNew), это не случай «||..||» из раздела 9.4, хотя по id переводу соответствует несколько сообщений Transfer; подпись «после FixedBackOff» у связей к DLT верна для ошибок обработки, о недесериализуемых записях ответ ничего не утверждает; фраза «Kafka Streams переводит её в COMPLETED…» в заголовке диаграммы 5 — упрощение, note там же уточняет роль TransferTrackingService.applyFinalStatus. Формат: заголовки, описания и список межбазовых логических связей помещены в комментарии %% внутри блоков mermaid, текста между блоками нет; в подписи узла CLIENT есть <br/>; сущности диаграммы 4г названы псевдонимами (TRANSFER_MESSAGE = com.example.common.Transfer, указано в комментарии). Промпт этого прямо не запрещает, в errors не внесено. Расхождений эталона с кодом по кейсу 4 не выявлено."
+}
